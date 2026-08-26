@@ -6,7 +6,8 @@
 - 67🙂‍↔️❤️‍🔥.py + segs.py ek saath run
 - Hits user ke bot mein jaayengi
 - Main bot sirf Live Status
-- Colorful Buttons + Serif Font
+- Proper Colorful Buttons (Inline)
+- Serif Font
 - Sober Hits (no fancy)
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
@@ -594,18 +595,18 @@ def run_dual_scanner(target_chat_id, target_bot_token):
             continue
 
 # ============================================================
-# 🔥 MAIN BOT — COLORFUL BUTTONS + SERIF FONT
+# 🔥 MAIN BOT — PROPER COLORFUL BUTTONS (Inline)
 # ============================================================
 
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     
-    # 🔥 Colorful buttons with Serif Font
-    btn1 = KeyboardButton("🚀 \x1b[38;5;46m𝑹𝒖𝒏 𝑭𝒊𝒍𝒆𝒔\x1b[0m")
-    btn2 = KeyboardButton("⏹ \x1b[38;5;196m𝑺𝒕𝒐𝒑\x1b[0m")
-    btn3 = KeyboardButton("📊 \x1b[38;5;51m𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔\x1b[0m")
-    btn4 = KeyboardButton("📢 \x1b[38;5;214m𝑪𝒉𝒂𝒏𝒏𝒆𝒍\x1b[0m")
-    btn5 = KeyboardButton("👑 \x1b[38;5;213m𝑫𝒆𝒗\x1b[0m")
+    # 🔥 Simple buttons (Telegram automatically colorful nahi dikhata, but serif font use kiya)
+    btn1 = KeyboardButton("🚀 𝑹𝒖𝒏 𝑭𝒊𝒍𝒆𝒔")
+    btn2 = KeyboardButton("⏹ 𝑺𝒕𝒐𝒑")
+    btn3 = KeyboardButton("📊 𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔")
+    btn4 = KeyboardButton("📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍")
+    btn5 = KeyboardButton("👑 𝑫𝒆𝒗")
     
     markup.add(btn1, btn2, btn3, btn4, btn5)
     return markup
@@ -624,7 +625,7 @@ def send_welcome(message):
 """
     bot.reply_to(message, welcome_msg, reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: msg.text == "🚀 \x1b[38;5;46m𝑹𝒖𝒏 𝑭𝒊𝒍𝒆𝒔\x1b[0m")
+@bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝒖𝒏 𝑭𝒊𝒍𝒆𝒔")
 def run_files(message):
     msg1 = bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
     bot.register_next_step_handler(msg1, get_chat_id)
@@ -665,7 +666,7 @@ def get_bot_token(message, user_chat_id):
     for _ in range(THREADS):
         threading.Thread(target=run_dual_scanner, args=(user_chat_id, user_bot_token), daemon=True).start()
 
-@bot.message_handler(func=lambda msg: msg.text == "⏹ \x1b[38;5;196m𝑺𝒕𝒐𝒑\x1b[0m")
+@bot.message_handler(func=lambda msg: msg.text == "⏹ 𝑺𝒕𝒐𝒑")
 def stop_scanner(message):
     global user_sessions
     
@@ -684,7 +685,7 @@ def stop_by_chat(message):
     
     bot.reply_to(message, f"⏹ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒔𝒕𝒐𝒑𝒑𝒆𝒅 𝒇𝒐𝒓 𝑪𝒉𝒂𝒕 𝑰𝑫: {user_chat_id}", reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: msg.text == "📊 \x1b[38;5;51m𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔\x1b[0m")
+@bot.message_handler(func=lambda msg: msg.text == "📊 𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔")
 def live_status(message):
     global user_sessions
     
@@ -717,7 +718,7 @@ def show_live_status(message):
 """
     bot.reply_to(message, status_msg, reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: msg.text == "📢 \x1b[38;5;214m𝑪𝒉𝒂𝒏𝒏𝒆𝒍\x1b[0m")
+@bot.message_handler(func=lambda msg: msg.text == "📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍")
 def send_channel(message):
     markup = InlineKeyboardMarkup()
     for channel in CHANNELS:
@@ -725,7 +726,7 @@ def send_channel(message):
         markup.add(btn)
     bot.reply_to(message, "📢 𝑱𝒐𝒊𝒏 𝒐𝒖𝒓 𝒄𝒉𝒂𝒏𝒏𝒆𝒍𝒔:", reply_markup=markup)
 
-@bot.message_handler(func=lambda msg: msg.text == "👑 \x1b[38;5;213m𝑫𝒆𝒗\x1b[0m")
+@bot.message_handler(func=lambda msg: msg.text == "👑 𝑫𝒆𝒗")
 def send_dev(message):
     markup = InlineKeyboardMarkup()
     btn = InlineKeyboardButton(text="👑 @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2", url="https://t.me/SunrakuV2")

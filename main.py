@@ -89,6 +89,13 @@ checker_bot = TeleBot(CHECKER_BOT_TOKEN)
 tracker_bot = TeleBot(TRACKER_BOT_TOKEN)
 
 # ============================================================
+# 🔥 CHECK JOIN (Force Subscribe Hata Diya)
+# ============================================================
+def check_join(chat_id):
+    """Force subscribe hata diya — sabko access"""
+    return True, []
+
+# ============================================================
 # 🔥 INSTAGRAM CHECKER
 # ============================================================
 class InstagramChecker:
@@ -351,19 +358,39 @@ def get_chat_id(message):
     main_bot.register_next_step_handler(msg2, lambda m: get_bot_token(m, user_chat_id))
 
 def get_bot_token(message, user_chat_id):
+    global user_sessions
     user_bot_token = message.text.strip()
     
     if not user_chat_id or not user_bot_token:
         main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝒊𝒏𝒑𝒖𝒕!", reply_markup=main_menu())
         return
     
+    # 🔥 Token validate karne ka sahi tarika
     try:
+        # Token mein space nahi hona chahiye
+        user_bot_token = user_bot_token.replace(" ", "")
+        
+        # Token format check (colon hona chahiye)
+        if ":" not in user_bot_token:
+            main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑻𝒐𝒌𝒆𝒏 𝑭𝒐𝒓𝒎𝒂𝒕! 𝑻𝒐𝒌𝒆𝒏 𝒎𝒆𝒊𝒏 ':' 𝒉𝒐𝒏𝒂 𝒄𝒉𝒂𝒉𝒊𝒚𝒆.", reply_markup=main_menu())
+            return
+        
+        # 🔥 Bot initialize karo aur check karo
         test_bot = TeleBot(user_bot_token)
-        test_bot.get_me()
-    except:
-        main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑩𝒐𝒕 𝑻𝒐𝒌𝒆𝒏!", reply_markup=main_menu())
+        bot_info = test_bot.get_me()  # Agar token galat hoga toh exception aayegi
+        
+        # Agar yahan tak aaya toh token sahi hai
+        main_bot.reply_to(message, f"✅ 𝑻𝒐𝒌𝒆𝒏 𝑽𝒂𝒍𝒊𝒅!\n🤖 𝑩𝒐𝒕: @{bot_info.username}", reply_markup=main_menu())
+        
+    except Exception as e:
+        error_msg = str(e)
+        if "401" in error_msg or "Unauthorized" in error_msg:
+            main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑩𝒐𝒕 𝑻𝒐𝒌𝒆𝒏!\n📌 𝑻𝒐𝒌𝒆𝒏 𝒔𝒂𝒉𝒊 𝒉𝒂𝒊? @BotFather 𝒔𝒆 𝒏𝒂𝒚𝒂 𝒕𝒐𝒌𝒆𝒏 𝒍𝒆𝒍𝒐.", reply_markup=main_menu())
+        else:
+            main_bot.reply_to(message, f"❌ 𝑬𝒓𝒓𝒐𝒓: {error_msg[:100]}", reply_markup=main_menu())
         return
     
+    # 🔥 Agar token sahi hai toh aage badho
     with lock:
         if user_chat_id in user_sessions and user_sessions[user_chat_id].get('is_running', False):
             main_bot.reply_to(message, "⚠️ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒂𝒍𝒓𝒆𝒂𝒅𝒚 𝒓𝒖𝒏𝒏𝒊𝒏𝒈!", reply_markup=main_menu())
@@ -503,6 +530,7 @@ def echo_all(message):
 print("✅ Main Bot is running...")
 print("📌 Bot Username: @" + main_bot.get_me().username)
 print("🎉 500 SUBS SPECIAL EDITION")
+print("📌 No force subscribe — sabko access")
 
 while True:
     try:

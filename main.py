@@ -11,8 +11,8 @@
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
+import os  # 🔥 IMPORTANT
 import sys
-import os
 import time
 import random
 import json
@@ -44,31 +44,15 @@ CYAN = "\033[38;5;51m"
 ORANGE = "\033[38;5;208m"
 
 # ============================================================
-# 📸 CLEAN UI
+# 🔥 RAILWAY READY — ENVIRONMENT VARIABLE (No input)
 # ============================================================
-os.system('cls' if os.name == 'nt' else 'clear')
-
-print(f"""
-{DARK_PURPLE}╔═══════════════════════════════════════════════════════════╗
-{DARK_PURPLE}║                                                           ║
-{DARK_PURPLE}║               {NEON_PINK}✦  𝑺𝑼𝑵𝑹𝑨𝑲𝑼  ✦  {NEON_BLUE}𝑩𝑶𝑻                   ║
-{DARK_PURPLE}║               {WHITE}𝑭𝑨𝑺𝑻 𝑺𝑪𝑨𝑵𝑵𝑬𝑹                           ║
-{DARK_PURPLE}║                                                           ║
-{DARK_PURPLE}║               {GOLD}🎉  𝟓𝟎𝟎 𝑺𝑼𝑩𝑺 𝑪𝑬𝑳𝑬𝑩𝑹𝑨𝑻𝑰𝑶𝑵  🎉               ║
-{DARK_PURPLE}║                                                           ║
-{DARK_PURPLE}║               {WHITE}◈  𝑬𝑵𝑻𝑬𝑹 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵                          ║
-{DARK_PURPLE}║                                                           ║
-{DARK_PURPLE}╚═══════════════════════════════════════════════════════════╝
-{RESET}
-""")
-
-print(f"{NEON_PINK}┌─────────────────────────────────────────────────────────┐")
-MAIN_BOT_TOKEN = input(f"{NEON_PINK}│  ✦ 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵 (Main Bot) ➜ {WHITE}").strip()
-print(f"{NEON_PINK}└─────────────────────────────────────────────────────────┘{RESET}")
-
+MAIN_BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not MAIN_BOT_TOKEN:
-    print(f"{RED}❌ Bot Token required!{RESET}")
+    print(f"{RED}❌ BOT_TOKEN environment variable not set!{RESET}")
+    print(f"{RED}❌ Please add BOT_TOKEN in Railway Variables!{RESET}")
     sys.exit()
+
+print(f"{GREEN}✅ Bot Token loaded from environment variable!{RESET}")
 
 # ============================================================
 # 🔥 INIT MAIN BOT
@@ -78,8 +62,7 @@ main_bot = TeleBot(MAIN_BOT_TOKEN)
 # ============================================================
 # 📊 GLOBALS
 # ============================================================
-# 🔥 Har user ki alag list
-user_sessions = {}  # {chat_id: {hits: 0, good: 0, bad: 0, total: 0, hits_list: [], is_running: False, stop_flag: False, threads: []}}
+user_sessions = {}
 lock = threading.Lock()
 THREADS = 30
 
@@ -263,17 +246,15 @@ class InstagramChecker:
         return None
 
 # ============================================================
-# 🚀 FAST SCANNER — Har User Ki Alag Session
+# 🚀 FAST SCANNER
 # ============================================================
 def scanner_for_user(chat_id, user_bot_token):
     """Har user ke liye alag scanner"""
     global user_sessions
     
-    # User ka bot initialize
     user_bot = TeleBot(user_bot_token)
     insta = InstagramChecker()
     
-    # User session data
     with lock:
         if chat_id not in user_sessions:
             user_sessions[chat_id] = {
@@ -315,7 +296,6 @@ def scanner_for_user(chat_id, user_bot_token):
                 }
                 session['hits_list'].append(hit_entry)
                 
-                # 🔥 Hit user ke bot mein bhejo
                 hit_msg = f"""
 ✅ HIT FOUND!
 👤 @{username}
@@ -338,7 +318,7 @@ def scanner_for_user(chat_id, user_bot_token):
             time.sleep(random.uniform(0.1, 0.2))
 
 # ============================================================
-# 📊 LIVE STATUS — User Ke Bot Mein
+# 📊 LIVE STATUS
 # ============================================================
 def send_status_to_user(chat_id, user_bot_token):
     global user_sessions
@@ -365,20 +345,17 @@ def send_status_to_user(chat_id, user_bot_token):
         pass
 
 # ============================================================
-# 🔥 BOT COMMANDS & BUTTONS — ALL CAPS SERIF FONT
+# 🔥 BOT COMMANDS & BUTTONS — ALL CAPS SERIF
 # ============================================================
 
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    
-    # 🔥 ALL CAPS SERIF FONT BUTTONS
     btn1 = KeyboardButton("🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
     btn2 = KeyboardButton("⏹ 𝑺𝑻𝑶𝑷")
     btn3 = KeyboardButton("📊 𝑻𝑶𝑻𝑨𝑳 𝑯𝑰𝑻𝑺")
     btn4 = KeyboardButton("📋 𝑽𝑰𝑬𝑾 𝑨𝑳𝑳")
     btn5 = KeyboardButton("📢 𝑪𝑯𝑨𝑵𝑵𝑬𝑳")
     btn6 = KeyboardButton("👑 𝑫𝑬𝑽")
-    
     markup.add(btn1, btn2, btn3, btn4, btn5, btn6)
     return markup
 
@@ -391,51 +368,42 @@ def send_welcome(message):
 
 📌 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 𝒂𝒏𝒅 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵
    𝑯𝒊𝒕𝒔 𝒘𝒊𝒍𝒍 𝒃𝒆 𝒔𝒆𝒏𝒕 𝒕𝒐 𝒀𝑶𝑼𝑹 𝒃𝒐𝒕 𝒐𝒏𝒍𝒚.
-   𝒀𝒐𝒖𝒓 𝒉𝒊𝒕𝒔 𝒂𝒓𝒆 𝒔𝒆𝒑𝒂𝒓𝒂𝒕𝒆 𝒇𝒓𝒐𝒎 𝒐𝒕𝒉𝒆𝒓𝒔.
 
 👑 𝑫𝒆𝒗: @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2
 📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍: @𝑨𝒏𝒊𝒔𝒉𝒑𝒚
-🎉 𝟓𝟎𝟎 𝑺𝑼𝑩𝑺 𝑺𝑷𝑬𝑪𝑰𝑨𝑳 𝑬𝑫𝑰𝑻𝑰𝑶𝑵
+🎉 𝟓𝟎𝟎 𝑺𝑼𝑩𝑺 𝑺𝑷𝑬𝑪𝑰𝑨𝑳
 """
     main_bot.reply_to(message, welcome_msg, reply_markup=main_menu())
 
 @main_bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
 def run_file(message):
-    # Ask for Chat ID
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 (𝒘𝒉𝒆𝒓𝒆 𝒉𝒊𝒕𝒔 𝒔𝒉𝒐𝒖𝒍𝒅 𝒈𝒐):")
+    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
     main_bot.register_next_step_handler(msg1, get_chat_id)
 
 def get_chat_id(message):
-    global user_sessions
     user_chat_id = message.text.strip()
-    
-    # Ask for Bot Token
-    msg2 = main_bot.reply_to(message, "✏️ 𝑵𝒐𝒘 𝒆𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵 (𝒋𝒊𝒔𝒎𝒆 𝒉𝒊𝒕𝒔 𝒂𝒂𝒏𝒊 𝒄𝒉𝒂𝒉𝒊𝒚𝒆):")
+    msg2 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵:")
     main_bot.register_next_step_handler(msg2, lambda m: get_bot_token(m, user_chat_id))
 
 def get_bot_token(message, user_chat_id):
-    global user_sessions
     user_bot_token = message.text.strip()
     
     if not user_chat_id or not user_bot_token:
-        main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝒊𝒏𝒑𝒖𝒕! 𝑻𝒓𝒚 𝒂𝒈𝒂𝒊𝒏.", reply_markup=main_menu())
+        main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝒊𝒏𝒑𝒖𝒕!", reply_markup=main_menu())
         return
     
-    # Verify user's bot token
     try:
         test_bot = TeleBot(user_bot_token)
         test_bot.get_me()
     except:
-        main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑩𝒐𝒕 𝑻𝒐𝒌𝒆𝒏! 𝑻𝒓𝒚 𝒂𝒈𝒂𝒊𝒏.", reply_markup=main_menu())
+        main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑩𝒐𝒕 𝑻𝒐𝒌𝒆𝒏!", reply_markup=main_menu())
         return
     
-    # Check if already running for this user
     with lock:
         if user_chat_id in user_sessions and user_sessions[user_chat_id].get('is_running', False):
-            main_bot.reply_to(message, "⚠️ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒂𝒍𝒓𝒆𝒂𝒅𝒚 𝒓𝒖𝒏𝒏𝒊𝒏𝒈 𝒇𝒐𝒓 𝒕𝒉𝒊𝒔 𝑪𝒉𝒂𝒕 𝑰𝑫! 𝑪𝒍𝒊𝒄𝒌 𝑺𝒕𝒐𝒑 𝒇𝒊𝒓𝒔𝒕.", reply_markup=main_menu())
+            main_bot.reply_to(message, "⚠️ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒂𝒍𝒓𝒆𝒂𝒅𝒚 𝒓𝒖𝒏𝒏𝒊𝒏𝒈!", reply_markup=main_menu())
             return
         
-        # Create session
         user_sessions[user_chat_id] = {
             'hits': 0, 'good': 0, 'bad': 0, 'total': 0,
             'hits_list': [], 'current_email': 'Waiting...',
@@ -443,17 +411,14 @@ def get_bot_token(message, user_chat_id):
         }
     
     main_bot.reply_to(message, f"""✅ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒔𝒕𝒂𝒓𝒕𝒆𝒅!
-📤 𝑯𝒊𝒕𝒔 𝒘𝒊𝒍𝒍 𝒃𝒆 𝒔𝒆𝒏𝒕 𝒕𝒐 𝒀𝑶𝑼𝑹 𝒃𝒐𝒕.
-📌 𝑪𝒉𝒂𝒕 𝑰𝑫: {user_chat_id}
+📤 𝑯𝒊𝒕𝒔 𝒘𝒊𝒍𝒍 𝒈𝒐 𝒕𝒐 𝒀𝑶𝑼𝑹 𝒃𝒐𝒕.
 🤖 𝑩𝒐𝒕: @{test_bot.get_me().username}
 
 ⏹ 𝑪𝒍𝒊𝒄𝒌 𝑺𝒕𝒐𝒑 𝒕𝒐 𝒆𝒏𝒅.""", reply_markup=main_menu())
     
-    # 🔥 30 threads start for this user
     for _ in range(THREADS):
         threading.Thread(target=scanner_for_user, args=(user_chat_id, user_bot_token), daemon=True).start()
     
-    # Status updater for this user
     def status_updater():
         while True:
             with lock:
@@ -467,33 +432,31 @@ def get_bot_token(message, user_chat_id):
 @main_bot.message_handler(func=lambda msg: msg.text == "⏹ 𝑺𝑻𝑶𝑷")
 def stop_scanner(message):
     global user_sessions
-    
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 𝒕𝒐 𝒔𝒕𝒐𝒑:")
-    main_bot.register_next_step_handler(msg1, stop_scanner_by_chat)
+    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
+    main_bot.register_next_step_handler(msg1, stop_by_chat)
 
-def stop_scanner_by_chat(message):
+def stop_by_chat(message):
     global user_sessions
     user_chat_id = message.text.strip()
     
     with lock:
         if user_chat_id not in user_sessions:
-            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅 𝒇𝒐𝒓 𝒕𝒉𝒊𝒔 𝑪𝒉𝒂𝒕 𝑰𝑫!", reply_markup=main_menu())
+            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
             return
         
         if not user_sessions[user_chat_id].get('is_running', False):
-            main_bot.reply_to(message, "⚠️ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒏𝒐𝒕 𝒓𝒖𝒏𝒏𝒊𝒏𝒈 𝒇𝒐𝒓 𝒕𝒉𝒊𝒔 𝑪𝒉𝒂𝒕 𝑰𝑫!", reply_markup=main_menu())
+            main_bot.reply_to(message, "⚠️ 𝑵𝒐𝒕 𝒓𝒖𝒏𝒏𝒊𝒏𝒈!", reply_markup=main_menu())
             return
         
         user_sessions[user_chat_id]['stop_flag'] = True
         user_sessions[user_chat_id]['is_running'] = False
     
-    main_bot.reply_to(message, f"⏹ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒔𝒕𝒐𝒑𝒑𝒆𝒅 𝒇𝒐𝒓 𝑪𝒉𝒂𝒕 𝑰𝑫: {user_chat_id}", reply_markup=main_menu())
+    main_bot.reply_to(message, f"⏹ 𝑺𝒕𝒐𝒑𝒑𝒆𝒅!", reply_markup=main_menu())
 
 @main_bot.message_handler(func=lambda msg: msg.text == "📊 𝑻𝑶𝑻𝑨𝑳 𝑯𝑰𝑻𝑺")
 def total_hits(message):
     global user_sessions
-    
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 𝒕𝒐 𝒔𝒆𝒆 𝒔𝒕𝒂𝒕𝒔:")
+    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
     main_bot.register_next_step_handler(msg1, show_total_hits)
 
 def show_total_hits(message):
@@ -502,9 +465,8 @@ def show_total_hits(message):
     
     with lock:
         if user_chat_id not in user_sessions:
-            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅 𝒇𝒐𝒓 𝒕𝒉𝒊𝒔 𝑪𝒉𝒂𝒕 𝑰𝑫!", reply_markup=main_menu())
+            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
             return
-        
         session = user_sessions[user_chat_id]
     
     status_msg = f"""
@@ -522,8 +484,7 @@ def show_total_hits(message):
 @main_bot.message_handler(func=lambda msg: msg.text == "📋 𝑽𝑰𝑬𝑾 𝑨𝑳𝑳")
 def view_all_hits(message):
     global user_sessions
-    
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 𝒕𝒐 𝒔𝒆𝒆 𝒂𝒍𝒍 𝒉𝒊𝒕𝒔:")
+    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
     main_bot.register_next_step_handler(msg1, show_all_hits)
 
 def show_all_hits(message):
@@ -532,16 +493,15 @@ def show_all_hits(message):
     
     with lock:
         if user_chat_id not in user_sessions:
-            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅 𝒇𝒐𝒓 𝒕𝒉𝒊𝒔 𝑪𝒉𝒂𝒕 𝑰𝑫!", reply_markup=main_menu())
+            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
             return
-        
         hits_list = user_sessions[user_chat_id].get('hits_list', [])
     
     if not hits_list:
-        main_bot.reply_to(message, "📋 𝑵𝒐 𝒉𝒊𝒕𝒔 𝒇𝒐𝒖𝒏𝒅 𝒚𝒆𝒕 𝒇𝒐𝒓 𝒕𝒉𝒊𝒔 𝑪𝒉𝒂𝒕 𝑰𝑫!", reply_markup=main_menu())
+        main_bot.reply_to(message, "📋 𝑵𝒐 𝒉𝒊𝒕𝒔 𝒚𝒆𝒕!", reply_markup=main_menu())
         return
     
-    hit_list = "📋 𝑨𝑳𝑳 𝑯𝑰𝑻𝑺 𝑳𝑰𝑺𝑻\n━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    hit_list = "📋 𝑨𝑳𝑳 𝑯𝑰𝑻𝑺\n━━━━━━━━━━━━━━━━━━━━━━━━━\n"
     for i, hit in enumerate(hits_list, 1):
         hit_list += f"{i}. @{hit['username']} | {hit['email']} | {hit['followers']} followers\n"
         if len(hit_list) > 3800:
@@ -570,20 +530,21 @@ def send_dev(message):
 
 @main_bot.message_handler(func=lambda msg: True)
 def echo_all(message):
-    main_bot.reply_to(message, "❌ 𝑼𝒔𝒆 𝒃𝒖𝒕𝒕𝒐𝒏𝒔 𝒃𝒆𝒍𝒐𝒘 👇", reply_markup=main_menu())
+    main_bot.reply_to(message, "❌ 𝑼𝒔𝒆 𝒃𝒖𝒕𝒕𝒐𝒏𝒔 👇", reply_markup=main_menu())
 
 # ============================================================
-# 🚀 START MAIN BOT
+# 🚀 START BOT — RAILWAY READY
 # ============================================================
 print("✅ Main Bot is running...")
 print("📌 Bot Username: @" + main_bot.get_me().username)
 print("🎉 500 SUBS SPECIAL EDITION")
-print("📌 Users will enter their Chat ID + Bot Token")
-print("📤 Hits will go to USER'S bot (sirf usi ko)")
-print("📊 Each user's hits are separate")
 print("Press Ctrl+C to stop")
 
-try:
-    main_bot.infinity_polling()
-except KeyboardInterrupt:
-    print("\n❌ Bot stopped.")
+# 🔥 Error handling ke saath polling
+while True:
+    try:
+        main_bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    except Exception as e:
+        print(f"⚠️ Polling error: {e}")
+        time.sleep(5)
+        continue

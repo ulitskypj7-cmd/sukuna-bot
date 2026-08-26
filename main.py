@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-🔥 SUNRAKU — FILE RUNNER BOT 🔥
+🔥 SUNRAKU — SEGS.PY RUNNER BOT 🔥
 - Bot se segs.py run hoga
 - Chat ID + Token input lega
 - Hits usi bot mein jaayengi
+- Live Status button — real-time stats
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
@@ -41,7 +42,7 @@ bot = TeleBot(BOT_TOKEN)
 # ============================================================
 # 📊 GLOBALS
 # ============================================================
-user_sessions = {}
+user_sessions = {}  # {chat_id: {hits, good, bad, total, current_email, is_running}}
 lock = threading.Lock()
 THREADS = 30
 
@@ -102,7 +103,7 @@ def check_join(chat_id):
     return len(not_joined) == 0, not_joined
 
 # ============================================================
-# 🔥 SEGS.PY ENGINE (Copied from segs.py)
+# 🔥 SEGS.PY ENGINE
 # ============================================================
 class GoogleChecker:
     def __init__(self):
@@ -501,11 +502,20 @@ def run_segs_for_user(target_chat_id, target_bot_token):
     insta = InstagramChecker()
     reporter = ReportManager(target_bot_token, target_chat_id)
     
-    hits = 0
-    good = 0
-    bad = 0
+    # 🔥 User session initialize
+    with lock:
+        if target_chat_id not in user_sessions:
+            user_sessions[target_chat_id] = {
+                'hits': 0, 'good': 0, 'bad': 0, 'total': 0,
+                'current_email': 'Waiting...', 'is_running': True
+            }
     
     while True:
+        with lock:
+            if target_chat_id not in user_sessions or not user_sessions[target_chat_id].get('is_running', True):
+                break
+            session = user_sessions[target_chat_id]
+        
         try:
             user_id = random.randint(2500000000, 21254029834)
             user_data = insta.get_user_data(user_id)
@@ -519,12 +529,14 @@ def run_segs_for_user(target_chat_id, target_bot_token):
                 continue
 
             email = f"{username}@gmail.com"
+            session['current_email'] = email
+            session['total'] += 1
 
             if insta.check_email(email):
-                good += 1
+                session['good'] += 1
                 
                 if google.check_availability(email) == 'good':
-                    hits += 1
+                    session['hits'] += 1
                     
                     profile = {
                         'username': username,
@@ -546,7 +558,7 @@ def run_segs_for_user(target_chat_id, target_bot_token):
                     except:
                         pass
             else:
-                bad += 1
+                session['bad'] += 1
 
             time.sleep(random.uniform(0.1, 0.3))
 
@@ -561,9 +573,10 @@ def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     btn1 = KeyboardButton("🚀 Run segs.py")
     btn2 = KeyboardButton("⏹ Stop")
-    btn3 = KeyboardButton("📢 Channel")
-    btn4 = KeyboardButton("👑 Dev")
-    markup.add(btn1, btn2, btn3, btn4)
+    btn3 = KeyboardButton("📊 Live Status")
+    btn4 = KeyboardButton("📢 Channel")
+    btn5 = KeyboardButton("👑 Dev")
+    markup.add(btn1, btn2, btn3, btn4, btn5)
     return markup
 
 @bot.message_handler(commands=['start'])
@@ -571,8 +584,8 @@ def send_welcome(message):
     welcome_msg = f"""
 ☠️ SUNRAKU — segs.py RUNNER ☠️
 
-🔥 Click "Run segs.py" to start.
-📌 Enter your CHAT ID + BOT TOKEN
+🔥 Click buttons below to control.
+📌 Enter CHAT ID + BOT TOKEN
 📤 Hits will go to YOUR bot.
 
 👑 Dev: @SunrakuV2
@@ -604,19 +617,84 @@ def get_bot_token(message, user_chat_id):
         bot.reply_to(message, "❌ Invalid Bot Token! Try again.", reply_markup=main_menu())
         return
     
+    # 🔥 Create session
+    with lock:
+        user_sessions[user_chat_id] = {
+            'hits': 0, 'good': 0, 'bad': 0, 'total': 0,
+            'current_email': 'Waiting...', 'is_running': True
+        }
+    
     bot.reply_to(message, f"""✅ segs.py started!
 📤 Hits will be sent to YOUR bot.
 📌 Chat ID: {user_chat_id}
 🤖 Bot: @{test_bot.get_me().username}
 
-⏹ Click Stop to end.""", reply_markup=main_menu())
+📊 Click 'Live Status' to see stats.
+⏹ Click 'Stop' to end.""", reply_markup=main_menu())
     
     # 🔥 Start segs.py engine for this user
     threading.Thread(target=run_segs_for_user, args=(user_chat_id, user_bot_token), daemon=True).start()
 
 @bot.message_handler(func=lambda msg: msg.text == "⏹ Stop")
 def stop_scanner(message):
-    bot.reply_to(message, "⏹ Scanner stopped! (Restart bot to fully stop)", reply_markup=main_menu())
+    global user_sessions
+    
+    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID to stop:")
+    bot.register_next_step_handler(msg1, stop_by_chat)
+
+def stop_by_chat(message):
+    global user_sessions
+    user_chat_id = message.text.strip()
+    
+    with lock:
+        if user_chat_id not in user_sessions:
+            bot.reply_to(message, "❌ No scanner found for this Chat ID!", reply_markup=main_menu())
+            return
+        
+        if not user_sessions[user_chat_id].get('is_running', False):
+            bot.reply_to(message, "⚠️ Scanner not running for this Chat ID!", reply_markup=main_menu())
+            return
+        
+        user_sessions[user_chat_id]['is_running'] = False
+    
+    bot.reply_to(message, f"⏹ Scanner stopped for Chat ID: {user_chat_id}", reply_markup=main_menu())
+
+# ============================================================
+# 📊 LIVE STATUS
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "📊 Live Status")
+def live_status(message):
+    global user_sessions
+    
+    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID to see live status:")
+    bot.register_next_step_handler(msg1, show_live_status)
+
+def show_live_status(message):
+    global user_sessions
+    user_chat_id = message.text.strip()
+    
+    with lock:
+        if user_chat_id not in user_sessions:
+            bot.reply_to(message, "❌ No scanner found for this Chat ID!", reply_markup=main_menu())
+            return
+        
+        session = user_sessions[user_chat_id]
+    
+    status_msg = f"""
+┌─────────────────────────────────────────┐
+│  ✦ SUNRAKU — segs.py RUNNER ✦          │
+├─────────────────────────────────────────┤
+│  ✅ GOOD  : {session.get('good', 0)}     │
+│  🔥 HITS : {session.get('hits', 0)}     │
+│  ❌ BAD   : {session.get('bad', 0)}     │
+│  📊 TOTAL : {session.get('total', 0)}   │
+│  📧 {session.get('current_email', 'Waiting...')[:30]:<30} │
+│  🟢 STATUS : {'RUNNING' if session.get('is_running', False) else 'STOPPED'} │
+├─────────────────────────────────────────┤
+│  ◈ @SunrakuV2  ●  @Anishpy             │
+└─────────────────────────────────────────┘
+"""
+    bot.reply_to(message, status_msg, reply_markup=main_menu())
 
 @bot.message_handler(func=lambda msg: msg.text == "📢 Channel")
 def send_channel(message):

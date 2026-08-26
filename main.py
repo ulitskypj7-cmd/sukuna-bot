@@ -8,7 +8,7 @@
 - 30 threads — fast scanning
 - Total Hits + View All Hits (Main Bot mein)
 - ALL CAPS SERIF FONT BUTTONS
-- FORCE SUBSCRIBE: @Anishpy, @VOUCH_R, Request Group
+- FORCE SUBSCRIBE: @Anishpy, @VOUCH_R, Request Group (-1004472230708)
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
@@ -62,12 +62,12 @@ lock = threading.Lock()
 THREADS = 30
 
 # ============================================================
-# 🔥 FORCE SUBSCRIBE CHANNELS
+# 🔥 FORCE SUBSCRIBE CHANNELS (With Group ID)
 # ============================================================
 REQUIRED_CHANNELS = [
     {"id": -1004456548997, "username": "@Anishpy", "link": "https://t.me/Anishpy"},
     {"id": -1004320460507, "username": "@VOUCH_R", "link": "https://t.me/VOUCH_R"},
-    {"id": None, "username": "Request Group", "link": "https://t.me/+qZFSahreYnU2OTUx"}
+    {"id": -1004472230708, "username": "Request Group", "link": "https://t.me/+qZFSahreYnU2OTUx"}
 ]
 
 # ============================================================
@@ -98,7 +98,7 @@ checker_bot = TeleBot(CHECKER_BOT_TOKEN)
 tracker_bot = TeleBot(TRACKER_BOT_TOKEN)
 
 # ============================================================
-# 🔥 CHECK JOIN (With Request Group)
+# 🔥 CHECK JOIN (Bot Admin Hai Toh Sab Check Ho Jayega)
 # ============================================================
 def check_join(chat_id):
     """Check if user has joined all required channels"""
@@ -106,14 +106,8 @@ def check_join(chat_id):
     not_joined = []
 
     for channel in REQUIRED_CHANNELS:
-        username = channel["username"]
         cid = channel["id"]
-
-        # 🔥 Request Group (no ID, can't check via bot)
-        if cid is None:
-            # Skip check, always show as "must join"
-            not_joined.append(username)
-            continue
+        username = channel["username"]
 
         try:
             if not chat_id:
@@ -128,7 +122,7 @@ def check_join(chat_id):
             else:
                 not_joined.append(username)
 
-        except:
+        except Exception as e:
             not_joined.append(username)
 
     return len(not_joined) == 0, not_joined
@@ -147,7 +141,6 @@ def force_subscribe_markup():
         )
         markup.add(btn)
     
-    # 🔥 Check again button
     btn_check = InlineKeyboardButton(
         text="✅ I HAVE JOINED",
         callback_data="check_join"
@@ -421,7 +414,6 @@ def send_welcome(message):
     is_joined, not_joined_list = check_join(user_id)
     
     if not is_joined:
-        # 🔥 Force subscribe message with buttons
         missing = "\n".join(not_joined_list)
         msg = f"""
 ☠️ **𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻** ☠️
@@ -455,10 +447,6 @@ After joining, click **"✅ I HAVE JOINED"** to continue.
 🎉 𝟓𝟎𝟎 𝑺𝑼𝑩𝑺 𝑺𝑷𝑬𝑪𝑰𝑨𝑳
 """
     main_bot.reply_to(message, welcome_msg, reply_markup=main_menu())
-
-# ============================================================
-# 🔥 OTHER COMMANDS (Same as before)
-# ============================================================
 
 @main_bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
 def run_file(message):

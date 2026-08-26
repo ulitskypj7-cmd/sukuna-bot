@@ -8,7 +8,8 @@
 - 30 threads — fast scanning
 - Total Hits + View All Hits (Main Bot mein)
 - ALL CAPS SERIF FONT BUTTONS
-- FORCE SUBSCRIBE: @Anishpy, @VOUCH_R, Request Group (-1004472230708)
+- FORCE SUBSCRIBE: @Anishpy, @VOUCH_R (Channels)
+- REQUEST MODE: Sirf request bhejna hai (member nahi banna)
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
@@ -60,15 +61,21 @@ main_bot = TeleBot(MAIN_BOT_TOKEN)
 user_sessions = {}
 lock = threading.Lock()
 THREADS = 30
+requested_users = set()  # 🔥 Users who sent request
 
 # ============================================================
-# 🔥 FORCE SUBSCRIBE CHANNELS (With Group ID)
+# 🔥 FORCE SUBSCRIBE CHANNELS
 # ============================================================
 REQUIRED_CHANNELS = [
     {"id": -1004456548997, "username": "@Anishpy", "link": "https://t.me/Anishpy"},
     {"id": -1004320460507, "username": "@VOUCH_R", "link": "https://t.me/VOUCH_R"},
-    {"id": -1004472230708, "username": "Request Group", "link": "https://t.me/+qZFSahreYnU2OTUx"}
 ]
+
+# ============================================================
+# 🔥 REQUEST GROUP
+# ============================================================
+REQUEST_GROUP_ID = -1004472230708
+REQUEST_GROUP_LINK = "https://t.me/+s5v5rCbhorpkYTEx"
 
 # ============================================================
 # 🔥 CONFIG
@@ -98,10 +105,10 @@ checker_bot = TeleBot(CHECKER_BOT_TOKEN)
 tracker_bot = TeleBot(TRACKER_BOT_TOKEN)
 
 # ============================================================
-# 🔥 CHECK JOIN (Bot Admin Hai Toh Sab Check Ho Jayega)
+# 🔥 CHECK CHANNEL JOIN
 # ============================================================
 def check_join(chat_id):
-    """Check if user has joined all required channels"""
+    """Check if user has joined required channels"""
     joined = []
     not_joined = []
 
@@ -128,12 +135,54 @@ def check_join(chat_id):
     return len(not_joined) == 0, not_joined
 
 # ============================================================
-# 🔥 FORCE SUBSCRIBE BUTTONS
+# 🔥 CHECK REQUEST STATUS (Sirf Request Check — Member Nahi)
+# ============================================================
+def check_request_sent(user_id):
+    """
+    Check if user has sent a join request.
+    Agar user member nahi hai toh bhi request check karega.
+    """
+    try:
+        # 🔥 Bot admin hai toh member list dekh sakta hai
+        member = checker_bot.get_chat_member(REQUEST_GROUP_ID, user_id)
+        
+        # Agar user member/admin/creator hai → request approve ho gayi
+        if member.status in ["member", "administrator", "creator"]:
+            return True, "approved"
+        else:
+            # Agar user member nahi hai, but request pending hai
+            return True, "pending"
+    
+    except Exception as e:
+        # Agar error aata hai (user not found), toh request nahi bheji
+        return False, "not_sent"
+
+# ============================================================
+# 🔥 FULL ACCESS CHECK
+# ============================================================
+def check_full_access(user_id):
+    """Check all requirements — sirf request check"""
+    # Check channels
+    is_joined, not_joined = check_join(user_id)
+    
+    # Check request status (sirf request bheji ya nahi)
+    request_sent, status = check_request_sent(user_id)
+    
+    if not is_joined:
+        return False, "channels", not_joined
+    elif not request_sent:
+        return False, "request", None
+    else:
+        return True, "approved", None  # 🔥 Request bheji hai toh access de do
+
+# ============================================================
+# 🔥 FORCE SUBSCRIBE + REQUEST BUTTONS
 # ============================================================
 def force_subscribe_markup():
-    """Buttons to join required channels"""
+    """Buttons to join channels and send request"""
     markup = InlineKeyboardMarkup(row_width=1)
     
+    # Channel buttons
     for channel in REQUIRED_CHANNELS:
         btn = InlineKeyboardButton(
             text=f"📢 JOIN {channel['username']}",
@@ -141,31 +190,47 @@ def force_subscribe_markup():
         )
         markup.add(btn)
     
+    # Request group button
+    btn_request = InlineKeyboardButton(
+        text="📨 SEND REQUEST",
+        url=REQUEST_GROUP_LINK
+    )
+    markup.add(btn_request)
+    
+    # Check buttons
     btn_check = InlineKeyboardButton(
-        text="✅ I HAVE JOINED",
-        callback_data="check_join"
+        text="✅ I HAVE JOINED & SENT REQUEST",
+        callback_data="check_full_access"
     )
     markup.add(btn_check)
     
     return markup
 
-@main_bot.callback_query_handler(func=lambda call: call.data == "check_join")
-def check_join_callback(call):
-    """Check if user joined after clicking button"""
+@main_bot.callback_query_handler(func=lambda call: call.data == "check_full_access")
+def check_full_access_callback(call):
+    """Check if user joined channels and sent request"""
     user_id = call.from_user.id
-    is_joined, not_joined_list = check_join(user_id)
+    has_access, reason, data = check_full_access(user_id)
     
-    if is_joined:
+    if has_access:
         main_bot.edit_message_text(
-            "✅ **Access Granted!**\n\nYou have joined all required channels.\nClick /start to use the bot.",
+            "✅ **Access Granted!**\n\nYou have joined all required channels and sent request.\nClick /start to use the bot.",
             call.message.chat.id,
             call.message.message_id,
             parse_mode='Markdown'
         )
-    else:
-        missing = "\n".join(not_joined_list)
+    elif reason == "channels":
+        missing = "\n".join(data)
         main_bot.edit_message_text(
             f"❌ **Still Missing:**\n{missing}\n\nPlease join all channels first.",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=force_subscribe_markup(),
+            parse_mode='Markdown'
+        )
+    elif reason == "request":
+        main_bot.edit_message_text(
+            "❌ **Request Not Sent!**\n\nPlease send a join request to the group first.\n\n🔗 [Send Request]({REQUEST_GROUP_LINK})",
             call.message.chat.id,
             call.message.message_id,
             reply_markup=force_subscribe_markup(),
@@ -411,11 +476,12 @@ def main_menu():
 @main_bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
-    is_joined, not_joined_list = check_join(user_id)
+    has_access, reason, data = check_full_access(user_id)
     
-    if not is_joined:
-        missing = "\n".join(not_joined_list)
-        msg = f"""
+    if not has_access:
+        if reason == "channels":
+            missing = "\n".join(data)
+            msg = f"""
 ☠️ **𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻** ☠️
 
 ❌ **MUST JOIN THESE CHANNELS FIRST:**
@@ -424,15 +490,33 @@ def send_welcome(message):
 
 🔽 **Click buttons below to join:**
 
-After joining, click **"✅ I HAVE JOINED"** to continue.
+After joining, click **"✅ I HAVE JOINED & SENT REQUEST"** to continue.
 """
-        main_bot.reply_to(
-            message, 
-            msg, 
-            reply_markup=force_subscribe_markup(),
-            parse_mode='Markdown'
-        )
-        return
+            main_bot.reply_to(
+                message, 
+                msg, 
+                reply_markup=force_subscribe_markup(),
+                parse_mode='Markdown'
+            )
+            return
+        elif reason == "request":
+            msg = f"""
+☠️ **𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻** ☠️
+
+✅ You have joined all required channels!
+
+📨 **Now send a join request to:**
+🔗 {REQUEST_GROUP_LINK}
+
+After sending request, click **"✅ I HAVE JOINED & SENT REQUEST"**.
+"""
+            main_bot.reply_to(
+                message, 
+                msg, 
+                reply_markup=force_subscribe_markup(),
+                parse_mode='Markdown'
+            )
+            return
     
     welcome_msg = f"""
 ☠️ 𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻 ☠️
@@ -451,12 +535,12 @@ After joining, click **"✅ I HAVE JOINED"** to continue.
 @main_bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
 def run_file(message):
     user_id = message.from_user.id
-    is_joined, _ = check_join(user_id)
+    has_access, reason, _ = check_full_access(user_id)
     
-    if not is_joined:
+    if not has_access:
         main_bot.reply_to(
             message, 
-            "❌ **You must join all required channels first!**\nClick /start to see join buttons.",
+            "❌ **You must join channels and send request first!**\nClick /start to see requirements.",
             parse_mode='Markdown'
         )
         return
@@ -603,7 +687,9 @@ def send_channel(message):
     for channel in REQUIRED_CHANNELS:
         btn = InlineKeyboardButton(text=f"📢 {channel['username']}", url=channel["link"])
         markup.add(btn)
-    main_bot.reply_to(message, "📢 𝑱𝒐𝒊𝒏 𝒐𝒖𝒓 𝒄𝒉𝒂𝒏𝒏𝒆𝒍𝒔:", reply_markup=markup)
+    btn_request = InlineKeyboardButton(text="📨 SEND REQUEST", url=REQUEST_GROUP_LINK)
+    markup.add(btn_request)
+    main_bot.reply_to(message, "📢 𝑱𝒐𝒊𝒏 𝒐𝒖𝒓 𝒄𝒉𝒂𝒏𝒏𝒆𝒍𝒔 𝒂𝒏𝒅 𝒔𝒆𝒏𝒅 𝒓𝒆𝒒𝒖𝒆𝒔𝒕:", reply_markup=markup)
 
 @main_bot.message_handler(func=lambda msg: msg.text == "👑 𝑫𝑬𝑽")
 def send_dev(message):
@@ -622,7 +708,8 @@ def echo_all(message):
 print("✅ Main Bot is running...")
 print("📌 Bot Username: @" + main_bot.get_me().username)
 print("🎉 500 SUBS SPECIAL EDITION")
-print("🔒 Force Subscribe: @Anishpy, @VOUCH_R, Request Group")
+print("🔒 Force Subscribe: @Anishpy, @VOUCH_R")
+print("📨 Request Mode: Sirf request bhejna hai (member nahi banna)")
 
 while True:
     try:

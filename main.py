@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-🔥 SUNRAKU — FAST SCANNER BOT 🔥
-- Har user apna bot token + chat ID daalega
-- Hits sirf usi user ke bot mein jaayengi
-- 30 threads — fast scanning
-- Total Hits + View All Hits (Main Bot mein)
-- ALL CAPS SERIF FONT BUTTONS
-- NO FORCE SUBSCRIBE
-- Dev: @SunrakuV2 | Channel: @Anishpy
+🔥 SUNRAKU — ADVANCED FILE RUNNER BOT 🔥
+- User file upload karega
+- Approval request teri chat ID pe jaayegi
+- Approve ke baad hi file run ho sakti hai
+- Default file bhi approval ke baad run hogi
+- Dev: @SunrakuV2 | Channel: @Anishpy | @VOUCH_R
 """
 
 import os
@@ -20,301 +18,178 @@ import json
 import re
 import requests
 import threading
-import uuid
-import secrets
-import base64
-import httpx
+import subprocess
+import shutil
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from user_agent import generate_user_agent
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 
 # ============================================================
-# 🎨 TERMINAL COLORS
+# 🔥 ENVIRONMENT VARIABLE
 # ============================================================
-RESET = "\033[0m"
-DARK_PURPLE = "\033[38;5;54m"
-NEON_PINK = "\033[38;5;213m"
-NEON_BLUE = "\033[38;5;51m"
-GOLD = "\033[38;5;220m"
-WHITE = "\033[97m"
-GREEN = "\033[38;5;46m"
-RED = "\033[38;5;196m"
-CYAN = "\033[38;5;51m"
-ORANGE = "\033[38;5;208m"
-
-# ============================================================
-# 🔥 RAILWAY READY — ENVIRONMENT VARIABLE
-# ============================================================
-MAIN_BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not MAIN_BOT_TOKEN:
-    print(f"{RED}❌ BOT_TOKEN environment variable not set!{RESET}")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    print("❌ BOT_TOKEN environment variable not set!")
     sys.exit()
 
-main_bot = TeleBot(MAIN_BOT_TOKEN)
+bot = TeleBot(BOT_TOKEN)
 
 # ============================================================
 # 📊 GLOBALS
 # ============================================================
 user_sessions = {}
 lock = threading.Lock()
-THREADS = 30
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# 🔥 Owner Chat ID (Approval ke liye)
+OWNER_CHAT_ID = 8641613327
+
+# 🔥 Pending approvals
+pending_approvals = {}  # {user_chat_id: {"file_path": path, "file_name": name, "user_id": user_id}}
 
 # ============================================================
-# 🔥 CONFIG
+# 🔥 DEFAULT FILE (Fast Hits Wali)
 # ============================================================
-CONFIG_URL = "https://raw.githubusercontent.com/a3564119-netizen/Sunraku-Config/main/config.json"
+DEFAULT_FILE = """
+import requests
+import random
+import time
 
-try:
-    data = requests.get(CONFIG_URL, timeout=10).json()
-except:
-    print("❌ Config fetch failed!")
-    sys.exit()
+def fast_scanner():
+    while True:
+        user_id = random.randint(2500000000, 21254029834)
+        print(f"Scanning: {user_id}")
+        time.sleep(0.1)
 
-TARGET_TOOL_NAME = "𝐒𝐮𝐧𝐫𝐚𝐤𝐮 × 𝐕𝐄𝐑𝐈𝐅𝐈𝐄𝐃"
-tool = next((t for t in data["tools"] if t["tool_name"] == TARGET_TOOL_NAME), None)
+if __name__ == "__main__":
+    fast_scanner()
+"""
 
-if not tool:
-    print("❌ Tool not found!")
-    sys.exit()
-
-FORCE_JOIN = tool["force_join"]
-CHANNELS = tool["channels"]
-CHECKER_BOT_TOKEN = tool["checker_bot_token"]
-TRACKER_BOT_TOKEN = tool["tracker_bot_token"]
-ADMIN_CHAT_IDS = tool["admins"]
-
-checker_bot = TeleBot(CHECKER_BOT_TOKEN)
-tracker_bot = TeleBot(TRACKER_BOT_TOKEN)
+# Save default file
+with open(os.path.join(UPLOAD_DIR, "default_scanner.py"), "w") as f:
+    f.write(DEFAULT_FILE)
 
 # ============================================================
-# 🔥 CHECK JOIN (Force Subscribe Hata Diya)
+# 🔥 USER SESSION MANAGER
 # ============================================================
-def check_join(chat_id):
-    """Force subscribe hata diya — sabko access"""
-    return True, []
-
-# ============================================================
-# 🔥 INSTAGRAM CHECKER
-# ============================================================
-class InstagramChecker:
-    def __init__(self):
-        self.session = requests.Session()
-        self.csrf = None
-        self.lsd = None
-        self.doc_id = "26672929172408668"
+class UserSession:
+    def __init__(self, chat_id):
+        self.chat_id = chat_id
+        self.file_path = None
+        self.process = None
+        self.is_running = False
+        self.is_approved = False  # 🔥 Approval status
+        self.logs = []
+        self.start_time = None
+        self.speed = 0
+        self.total_checks = 0
         self.lock = threading.Lock()
+    
+    def add_log(self, msg):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.logs.append(f"[{timestamp}] {msg}")
+        if len(self.logs) > 100:
+            self.logs.pop(0)
+    
+    def get_logs(self, lines=20):
+        return "\n".join(self.logs[-lines:]) if self.logs else "No logs yet."
 
-    def _ensure_tokens(self):
-        with self.lock:
-            if self.csrf and self.lsd:
-                return True
-        try:
-            headers = {
-                'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-                'x-ig-app-id': "936619743392459",
-                'x-bloks-version-id': "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
-                'origin': "https://www.instagram.com",
-                'referer': "https://www.instagram.com/",
-            }
-            response = self.session.get('https://www.instagram.com/', headers=headers, timeout=20)
-            if response.status_code == 200:
-                csrf = response.cookies.get('csrftoken', '')
-                match = re.search(r'"LSD",\[\],\{"token":"([^"]+)"\}', response.text)
-                lsd = match.group(1) if match else None
-                if csrf and lsd:
-                    with self.lock:
-                        self.csrf = csrf
-                        self.lsd = lsd
-                    return True
-        except:
-            pass
+# ============================================================
+# 🔥 APPROVAL SYSTEM
+# ============================================================
+def send_approval_request(user_chat_id, file_name, file_path):
+    """Owner ko approval request bhejo"""
+    msg = f"""
+🔔 **NEW FILE UPLOADED - APPROVAL NEEDED**
+
+👤 User ID: `{user_chat_id}`
+📁 File: `{file_name}`
+📂 Path: `{file_path}`
+
+📌 Click Approve to allow user to run this file.
+"""
+    markup = InlineKeyboardMarkup(row_width=2)
+    btn_approve = InlineKeyboardButton(
+        text="✅ APPROVE",
+        callback_data=f"approve_{user_chat_id}_{file_path}"
+    )
+    btn_reject = InlineKeyboardButton(
+        text="❌ REJECT",
+        callback_data=f"reject_{user_chat_id}"
+    )
+    markup.add(btn_approve, btn_reject)
+    
+    try:
+        bot.send_message(OWNER_CHAT_ID, msg, reply_markup=markup, parse_mode='Markdown')
+        return True
+    except Exception as e:
+        print(f"Approval send error: {e}")
         return False
 
-    def check_email(self, email):
-        url = "https://i.instagram.com/api/v1/bloks/async_action/com.bloks.www.caa.ar.search.async/"
-        device = "android-" + ''.join(random.choices('abcdef0123456789', k=16))
-        family = str(uuid.uuid4())
-        android = "android-" + ''.join(random.choices('abcdef0123456789', k=16))
-        waterfall = str(uuid.uuid4())
-
-        payload = {
-            'params': "{\"client_input_params\":{\"aac\":\"{\\\"aac_init_timestamp\\\":"+ str(int(time.time())) +",\\\"aacjid\\\":\\\""+ str(uuid.uuid4()) +"\\\",\\\"aaccs\\\":\\\""+ secrets.token_urlsafe(32) +"\\\"}\",\"flash_call_permissions_status\":{\"READ_PHONE_STATE\":\"PERMANENTLY_DENIED\",\"READ_CALL_LOG\":\"DENIED\",\"ANSWER_PHONE_CALLS\":\"DENIED\"},\"was_headers_prefill_available\":0,\"network_bssid\":null,\"sfdid\":\"\",\"fetched_email_token_list\":{},\"search_query\":\""+ email +"\",\"auth_secure_device_id\":\"\",\"ig_oauth_token\":[],\"cloud_trust_token\":null,\"was_headers_prefill_used\":0,\"sso_accounts_auth_data\":[],\"encrypted_msisdn\":\"\",\"device_network_info\":null,\"text_input_id\":\"akyuf0:61\",\"zero_balance_state\":null,\"android_build_type\":\"release\",\"accounts_list\":[],\"is_oauth_without_permission\":0,\"ig_android_qe_device_id\":\""+ device +"\",\"gms_incoming_call_retriever_eligibility\":\"client_not_supported\",\"search_screen_type\":\"email_or_username\",\"is_whatsapp_installed\":1,\"lois_settings\":{\"lois_token\":\"\"},\"ig_vetted_device_nonce\":null,\"headers_infra_flow_id\":\"\",\"fetched_email_list\":[]},\"server_params\":{\"event_request_id\":\""+ str(uuid.uuid4()) +"\",\"is_from_logged_out\":0,\"layered_homepage_experiment_group\":null,\"device_id\":\""+ android +"\",\"login_surface\":\"login_home\",\"waterfall_id\":\""+ waterfall +"\",\"INTERNAL__latency_qpl_instance_id\":6.3987980400102E13,\"is_platform_login\":0,\"context_data\":\"\",\"login_entry_point\":\"logged_out\",\"INTERNAL__latency_qpl_marker_id\":36707139,\"family_device_id\":\""+ family +"\",\"offline_experiment_group\":\"caa_iteration_v3_perf_ig_4\",\"access_flow_version\":\"pre_mt_behavior\",\"is_from_logged_in_switcher\":0,\"qe_device_id\":\""+ device +"\"}}",
-            'bk_client_context': "{\"bloks_version\":\"5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b\",\"styles_id\":\"instagram\"}",
-            'bloks_versioning_id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b"
-        }
-        headers = {
-            'User-Agent': "Instagram 320.0.0.34.109 Android (33/13; 420dpi; 1080x2340; samsung; SM-A546B; a54x; exynos1380; en_US; 465123678)",
-            'accept-language': "en-IN, en-US",
-            'x-bloks-version-id': "5e47baf35c5a270b44c8906c8b99063564b30ef69779f3dee0b828bee2e4ef5b",
-            'x-fb-friendly-name': "IgApi: bloks/async_action/com.bloks.www.caa.ar.search.async/",
-            'x-ig-android-id': android,
-            'x-ig-app-id': "567067343352427",
-            'x-ig-app-locale': "en_IN",
-            'x-ig-client-endpoint': "com.bloks.www.caa.ar.search",
-            'x-ig-device-id': device,
-            'x-ig-family-device-id': family,
-            'x-ig-timezone-offset': str(int(datetime.now().astimezone().utcoffset().total_seconds())),
-            'x-mid': base64.urlsafe_b64encode(secrets.token_bytes(18)).decode().rstrip('='),
-            'x-pigeon-rawclienttime': str(time.time()),
-            'x-pigeon-session-id': f"UFS-{uuid.uuid4()}-0",
-            'sec-ch-ua': '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-origin',
-        }
-        try:
-            resp = requests.post(url, data=payload, headers=headers, timeout=10)
-            if f"{email}" in resp.text:
-                return True
-            return False
-        except:
-            return False
-
-    def get_user_data(self, user_id):
-        if not self._ensure_tokens():
-            return None
-        url = "https://www.instagram.com/api/graphql"
-        headers = {
-            'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'x-bloks-version-id': "f0fd53409d7667526e529854656fe20159af8b76db89f40c333e593b51a2ce10",
-            'x-ig-app-id': '936619743392459',
-            'x-fb-lsd': self.lsd,
-            'x-csrftoken': self.csrf,
-            'x-fb-friendly-name': 'PolarisProfilePageContentQuery',
-            'sec-ch-ua-platform': '"Android"',
-            'origin': 'https://www.instagram.com',
-            'sec-fetch-site': 'same-origin'
-        }
-        cookies = {'rur': '"HIL\\0545636887483\\0541808136332:01fe43b89fcef61b8a466bfa81acf2b1bbab08f406fc99b1da8b7d889fa68683a3364c43"'}
-        variables = {
-            "enable_integrity_filters": True,
-            "id": str(user_id),
-            "__relay_internal__pv__PolarisCannesGuardianExperienceEnabledrelayprovider": True,
-            "__relay_internal__pv__PolarisCASB976ProfileEnabledrelayprovider": False,
-            "__relay_internal__pv__PolarisWebSchoolsEnabledrelayprovider": False,
-            "__relay_internal__pv__PolarisRepostsConsumptionEnabledrelayprovider": False,
-        }
-        payload = {
-            'lsd': self.lsd,
-            'fb_api_caller_class': 'RelayModern',
-            'fb_api_req_friendly_name': 'PolarisProfilePageContentQuery',
-            'variables': json.dumps(variables),
-            'server_timestamps': 'true',
-            'doc_id': self.doc_id,
-        }
-        try:
-            response = self.session.post(url, headers=headers, data=payload, cookies=cookies, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                user = data.get('data', {}).get('user')
-                if user and user.get('username'):
-                    return user
-        except:
-            pass
-        return None
-
-# ============================================================
-# 🚀 FAST SCANNER
-# ============================================================
-def scanner_for_user(chat_id, user_bot_token):
-    global user_sessions
-    
-    user_bot = TeleBot(user_bot_token)
-    insta = InstagramChecker()
+@bot.callback_query_handler(func=lambda call: call.data.startswith("approve_"))
+def approve_file(call):
+    """Owner ne approve kiya"""
+    data = call.data.split("_")
+    user_chat_id = int(data[1])
+    file_path = "_".join(data[2:])  # Path mein underscores ho sakte hain
     
     with lock:
-        if chat_id not in user_sessions:
-            user_sessions[chat_id] = {
-                'hits': 0, 'good': 0, 'bad': 0, 'total': 0,
-                'hits_list': [], 'current_email': 'Waiting...',
-                'is_running': True, 'stop_flag': False
-            }
-    
-    while True:
-        with lock:
-            if chat_id not in user_sessions or user_sessions[chat_id].get('stop_flag', False):
-                break
-            session = user_sessions[chat_id]
-        
-        try:
-            user_id = random.randint(2500000000, 21254029834)
-            user_data = insta.get_user_data(user_id)
-            
-            if not user_data:
-                continue
-
-            username = user_data.get('username')
-            if not username:
-                continue
-
-            email = f"{username}@gmail.com"
-            session['current_email'] = email
-            session['total'] += 1
-
-            if insta.check_email(email):
-                session['good'] += 1
-                session['hits'] += 1
-                
-                hit_entry = {
-                    'username': username,
-                    'email': email,
-                    'followers': user_data.get('follower_count', 0),
-                    'time': datetime.now().strftime('%H:%M:%S')
-                }
-                session['hits_list'].append(hit_entry)
-                
-                hit_msg = f"""
-✅ HIT FOUND!
-👤 @{username}
-📧 {email}
-👥 {user_data.get('follower_count', 0)} followers
-━━━━━━━━━━━━━━━━━━━━━━━━━
-👑 @SunrakuV2 | 📢 @Anishpy
-🎉 500 SUBS SPECIAL
-"""
-                try:
-                    user_bot.send_message(chat_id, hit_msg)
-                except:
-                    pass
-            else:
-                session['bad'] += 1
-
-            time.sleep(random.uniform(0.05, 0.15))
-
-        except:
-            time.sleep(random.uniform(0.1, 0.2))
-
-# ============================================================
-# 📊 LIVE STATUS
-# ============================================================
-def send_status_to_user(chat_id, user_bot_token):
-    global user_sessions
-    
-    with lock:
-        if chat_id not in user_sessions:
+        if user_chat_id not in user_sessions:
+            bot.answer_callback_query(call.id, "❌ User session not found!")
             return
-        session = user_sessions[chat_id]
+        session = user_sessions[user_chat_id]
+        session.is_approved = True
+        session.add_log("✅ File approved by owner")
     
-    status_msg = f"""
-┌─────────────────────────────────────────┐
-│  ✦ SUNRAKU 500 BOT ✦                   │
-├─────────────────────────────────────────┤
-│  ✅ GOOD  : {session['good']}  🔥 HITS : {session['hits']}  ❌ BAD : {session['bad']} │
-│  📊 TOTAL : {session['total']}           │
-│  📧 {session['current_email'][:30]:<30} │
-│  ◈ @SunrakuV2  ●  @Anishpy             │
-└─────────────────────────────────────────┘
-"""
+    bot.edit_message_text(
+        f"✅ **File Approved!**\n👤 User: `{user_chat_id}`\n📁 File: `{os.path.basename(file_path)}`\n\nUser can now run the file.",
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode='Markdown'
+    )
+    
+    # User ko notify karo
     try:
-        user_bot = TeleBot(user_bot_token)
-        user_bot.send_message(chat_id, status_msg)
+        bot.send_message(
+            user_chat_id,
+            f"✅ **Your file has been approved!**\n\n📁 `{os.path.basename(file_path)}`\n🚀 Click **RUN FILE** to start.",
+            parse_mode='Markdown'
+        )
     except:
         pass
+    
+    bot.answer_callback_query(call.id, "✅ Approved!")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("reject_"))
+def reject_file(call):
+    """Owner ne reject kiya"""
+    user_chat_id = int(call.data.split("_")[1])
+    
+    with lock:
+        if user_chat_id in user_sessions:
+            session = user_sessions[user_chat_id]
+            session.is_approved = False
+            session.add_log("❌ File rejected by owner")
+    
+    bot.edit_message_text(
+        f"❌ **File Rejected!**\n👤 User: `{user_chat_id}`\n\nFile has been rejected by owner.",
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode='Markdown'
+    )
+    
+    # User ko notify karo
+    try:
+        bot.send_message(
+            user_chat_id,
+            "❌ **Your file has been rejected by the owner.**\n\nPlease contact @SunrakuV2 for approval.",
+            parse_mode='Markdown'
+        )
+    except:
+        pass
+    
+    bot.answer_callback_query(call.id, "❌ Rejected!")
 
 # ============================================================
 # 🔥 BOT COMMANDS & BUTTONS
@@ -322,219 +197,343 @@ def send_status_to_user(chat_id, user_bot_token):
 
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn1 = KeyboardButton("🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
-    btn2 = KeyboardButton("⏹ 𝑺𝑻𝑶𝑷")
-    btn3 = KeyboardButton("📊 𝑻𝑶𝑻𝑨𝑳 𝑯𝑰𝑻𝑺")
-    btn4 = KeyboardButton("📋 𝑽𝑰𝑬𝑾 𝑨𝑳𝑳")
-    btn5 = KeyboardButton("📢 𝑪𝑯𝑨𝑵𝑵𝑬𝑳")
-    btn6 = KeyboardButton("👑 𝑫𝑬𝑽")
-    markup.add(btn1, btn2, btn3, btn4, btn5, btn6)
+    
+    btn1 = KeyboardButton("📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
+    btn2 = KeyboardButton("🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
+    btn3 = KeyboardButton("⏹ 𝑺𝑻𝑶𝑷 𝑭𝑰𝑳𝑬")
+    btn4 = KeyboardButton("📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
+    btn5 = KeyboardButton("📊 𝑺𝑻𝑨𝑻𝑼𝑺")
+    btn6 = KeyboardButton("⚡ 𝑺𝑷𝑬𝑬𝑫")
+    btn7 = KeyboardButton("🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
+    btn8 = KeyboardButton("👑 𝑫𝑬𝑽")
+    
+    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8)
     return markup
 
-@main_bot.message_handler(commands=['start'])
+@bot.message_handler(commands=['start'])
 def send_welcome(message):
+    chat_id = message.chat.id
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+    
     welcome_msg = f"""
-☠️ 𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻 ☠️
+☠️ 𝑺𝑼𝑵𝑹𝑨𝑲𝑼 — 𝑭𝑰𝑳𝑬 𝑹𝑼𝑵𝑵𝑬𝑹 ☠️
 
 🔥 𝑪𝒍𝒊𝒄𝒌 𝒃𝒖𝒕𝒕𝒐𝒏𝒔 𝒃𝒆𝒍𝒐𝒘 𝒕𝒐 𝒄𝒐𝒏𝒕𝒓𝒐𝒍.
 
-📌 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫 𝒂𝒏𝒅 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵
-   𝑯𝒊𝒕𝒔 𝒘𝒊𝒍𝒍 𝒃𝒆 𝒔𝒆𝒏𝒕 𝒕𝒐 𝒀𝑶𝑼𝑹 𝒃𝒐𝒕 𝒐𝒏𝒍𝒚.
+📌 **File Upload requires approval!**
+   Owner will approve before you can run.
+
+📤 𝑼𝒑𝒍𝒐𝒂𝒅 𝒚𝒐𝒖𝒓 .𝒑𝒚 𝒇𝒊𝒍𝒆
+🚀 𝑹𝒖𝒏 𝒂𝒑𝒑𝒓𝒐𝒗𝒆𝒅 𝒇𝒊𝒍𝒆
+📋 𝑽𝒊𝒆𝒘 𝒍𝒊𝒗𝒆 𝒍𝒐𝒈𝒔
+📊 𝑪𝒉𝒆𝒄𝒌 𝒔𝒕𝒂𝒕𝒖𝒔 𝒂𝒏𝒅 𝒔𝒑𝒆𝒆𝒅
+🔥 𝑹𝒖𝒏 𝒅𝒆𝒇𝒂𝒖𝒍𝒕 𝒇𝒂𝒔𝒕 𝒔𝒄𝒂𝒏𝒏𝒆𝒓
 
 👑 𝑫𝒆𝒗: @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2
-📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍: @𝑨𝒏𝒊𝒔𝒉𝒑𝒚
-🎉 𝟓𝟎𝟎 𝑺𝑼𝑩𝑺 𝑺𝑷𝑬𝑪𝑰𝑨𝑳
+📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍: @𝑨𝒏𝒊𝒔𝒉𝒑𝒚 | @𝑽𝑶𝑼𝑪𝑯_𝑹
 """
-    main_bot.reply_to(message, welcome_msg, reply_markup=main_menu())
+    bot.reply_to(message, welcome_msg, reply_markup=main_menu())
 
-@main_bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
-def run_file(message):
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
-    main_bot.register_next_step_handler(msg1, get_chat_id)
+# ============================================================
+# 📤 UPLOAD FILE
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
+def upload_file(message):
+    bot.reply_to(message, "📤 **Send your .py file** (max 5MB)\n\n📌 File will be sent for approval before you can run it.", parse_mode='Markdown')
 
-def get_chat_id(message):
-    user_chat_id = message.text.strip()
-    msg2 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑩𝑶𝑻 𝑻𝑶𝑲𝑬𝑵:")
-    main_bot.register_next_step_handler(msg2, lambda m: get_bot_token(m, user_chat_id))
-
-def get_bot_token(message, user_chat_id):
-    global user_sessions
-    user_bot_token = message.text.strip()
+@bot.message_handler(content_types=['document'])
+def handle_file_upload(message):
+    chat_id = message.chat.id
+    file_id = message.document.file_id
     
-    if not user_chat_id or not user_bot_token:
-        main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝒊𝒏𝒑𝒖𝒕!", reply_markup=main_menu())
+    if not message.document.file_name.endswith('.py'):
+        bot.reply_to(message, "❌ **Only .py files are allowed!**", parse_mode='Markdown')
         return
     
-    # 🔥 Token validate karne ka sahi tarika
+    if message.document.file_size > 5 * 1024 * 1024:
+        bot.reply_to(message, "❌ **File too large! Max 5MB.**", parse_mode='Markdown')
+        return
+    
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+        session = user_sessions[chat_id]
+        session.is_approved = False  # 🔥 Reset approval on new upload
+    
     try:
-        # Token mein space nahi hona chahiye
-        user_bot_token = user_bot_token.replace(" ", "")
+        file_info = bot.get_file(file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
         
-        # Token format check (colon hona chahiye)
-        if ":" not in user_bot_token:
-            main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑻𝒐𝒌𝒆𝒏 𝑭𝒐𝒓𝒎𝒂𝒕! 𝑻𝒐𝒌𝒆𝒏 𝒎𝒆𝒊𝒏 ':' 𝒉𝒐𝒏𝒂 𝒄𝒉𝒂𝒉𝒊𝒚𝒆.", reply_markup=main_menu())
-            return
+        file_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{message.document.file_name}")
+        with open(file_path, 'wb') as f:
+            f.write(downloaded_file)
         
-        # 🔥 Bot initialize karo aur check karo
-        test_bot = TeleBot(user_bot_token)
-        bot_info = test_bot.get_me()  # Agar token galat hoga toh exception aayegi
+        session.file_path = file_path
+        session.add_log(f"📤 File uploaded: {message.document.file_name}")
         
-        # Agar yahan tak aaya toh token sahi hai
-        main_bot.reply_to(message, f"✅ 𝑻𝒐𝒌𝒆𝒏 𝑽𝒂𝒍𝒊𝒅!\n🤖 𝑩𝒐𝒕: @{bot_info.username}", reply_markup=main_menu())
+        # 🔥 Send approval request to owner
+        success = send_approval_request(chat_id, message.document.file_name, file_path)
+        
+        if success:
+            bot.reply_to(message, f"✅ **File uploaded successfully!**\n📁 `{message.document.file_name}`\n\n⏳ **Waiting for owner approval...**\nYou will be notified when approved.", parse_mode='Markdown')
+        else:
+            bot.reply_to(message, f"⚠️ **File uploaded but approval failed!**\nPlease contact @SunrakuV2 manually.", parse_mode='Markdown')
         
     except Exception as e:
-        error_msg = str(e)
-        if "401" in error_msg or "Unauthorized" in error_msg:
-            main_bot.reply_to(message, "❌ 𝑰𝒏𝒗𝒂𝒍𝒊𝒅 𝑩𝒐𝒕 𝑻𝒐𝒌𝒆𝒏!\n📌 𝑻𝒐𝒌𝒆𝒏 𝒔𝒂𝒉𝒊 𝒉𝒂𝒊? @BotFather 𝒔𝒆 𝒏𝒂𝒚𝒂 𝒕𝒐𝒌𝒆𝒏 𝒍𝒆𝒍𝒐.", reply_markup=main_menu())
-        else:
-            main_bot.reply_to(message, f"❌ 𝑬𝒓𝒓𝒐𝒓: {error_msg[:100]}", reply_markup=main_menu())
+        bot.reply_to(message, f"❌ **Upload failed:** {str(e)}", parse_mode='Markdown')
+
+# ============================================================
+# 🔥 DEFAULT FILE
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
+def set_default_file(message):
+    chat_id = message.chat.id
+    
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+        session = user_sessions[chat_id]
+    
+    default_path = os.path.join(UPLOAD_DIR, "default_scanner.py")
+    session.file_path = default_path
+    session.is_approved = False  # 🔥 Default file bhi approval require karega
+    session.add_log("🔥 Default file selected - pending approval")
+    
+    # 🔥 Send approval request for default file
+    success = send_approval_request(chat_id, "default_scanner.py", default_path)
+    
+    if success:
+        bot.reply_to(message, "✅ **Default scanner selected!**\n\n⏳ **Waiting for owner approval...**\nYou will be notified when approved.", parse_mode='Markdown')
+    else:
+        bot.reply_to(message, "⚠️ **Default file selected but approval failed!**\nPlease contact @SunrakuV2.", parse_mode='Markdown')
+
+# ============================================================
+# 🚀 RUN FILE
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
+def run_file(message):
+    chat_id = message.chat.id
+    
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+        session = user_sessions[chat_id]
+    
+    # 🔥 Check approval
+    if not session.is_approved:
+        bot.reply_to(message, "❌ **File not approved!**\n\n📌 Upload a file or select default file.\n⏳ Wait for owner approval.", parse_mode='Markdown')
         return
     
-    # 🔥 Agar token sahi hai toh aage badho
-    with lock:
-        if user_chat_id in user_sessions and user_sessions[user_chat_id].get('is_running', False):
-            main_bot.reply_to(message, "⚠️ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒂𝒍𝒓𝒆𝒂𝒅𝒚 𝒓𝒖𝒏𝒏𝒊𝒏𝒈!", reply_markup=main_menu())
-            return
+    if session.is_running:
+        bot.reply_to(message, "⚠️ **File is already running!**\nClick **STOP FILE** first.", parse_mode='Markdown')
+        return
+    
+    if not session.file_path or not os.path.exists(session.file_path):
+        session.add_log("❌ No file found! Upload or select default.")
+        bot.reply_to(message, "❌ **No file found!**\n\n📤 Upload a .py file\n🔥 Or select **DEFAULT FILE**", parse_mode='Markdown')
+        return
+    
+    try:
+        # Install requirements if present
+        req_file = os.path.join(os.path.dirname(session.file_path), "requirements.txt")
+        if os.path.exists(req_file):
+            subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_file], capture_output=True)
+            session.add_log("📦 Requirements installed")
         
-        user_sessions[user_chat_id] = {
-            'hits': 0, 'good': 0, 'bad': 0, 'total': 0,
-            'hits_list': [], 'current_email': 'Waiting...',
-            'is_running': True, 'stop_flag': False
-        }
-    
-    main_bot.reply_to(message, f"""✅ 𝑺𝒄𝒂𝒏𝒏𝒆𝒓 𝒔𝒕𝒂𝒓𝒕𝒆𝒅!
-📤 𝑯𝒊𝒕𝒔 𝒘𝒊𝒍𝒍 𝒈𝒐 𝒕𝒐 𝒀𝑶𝑼𝑹 𝒃𝒐𝒕.
-🤖 𝑩𝒐𝒕: @{test_bot.get_me().username}
-
-⏹ 𝑪𝒍𝒊𝒄𝒌 𝑺𝒕𝒐𝒑 𝒕𝒐 𝒆𝒏𝒅.""", reply_markup=main_menu())
-    
-    for _ in range(THREADS):
-        threading.Thread(target=scanner_for_user, args=(user_chat_id, user_bot_token), daemon=True).start()
-    
-    def status_updater():
-        while True:
-            with lock:
-                if user_chat_id not in user_sessions or not user_sessions[user_chat_id].get('is_running', False):
+        # Run file
+        session.process = subprocess.Popen(
+            [sys.executable, session.file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+        session.is_running = True
+        session.start_time = datetime.now()
+        session.total_checks = 0
+        session.add_log(f"🚀 File started: {os.path.basename(session.file_path)}")
+        
+        # Log reader thread
+        def read_logs():
+            while session.is_running:
+                try:
+                    output = session.process.stdout.readline()
+                    if output:
+                        session.add_log(output.strip())
+                        session.total_checks += 1
+                except:
                     break
-            send_status_to_user(user_chat_id, user_bot_token)
-            time.sleep(5)
-    
-    threading.Thread(target=status_updater, daemon=True).start()
+            
+            # Read remaining stderr
+            if session.process:
+                stderr = session.process.stderr.read()
+                if stderr:
+                    session.add_log(f"⚠️ {stderr.strip()}")
+        
+        threading.Thread(target=read_logs, daemon=True).start()
+        
+        bot.reply_to(message, f"✅ **File started!**\n📁 `{os.path.basename(session.file_path)}`\n\n📋 Click **VIEW LOGS** to see output.\n📊 Click **STATUS** to check progress.", parse_mode='Markdown')
+        
+    except Exception as e:
+        session.is_running = False
+        session.add_log(f"❌ Run error: {str(e)}")
+        bot.reply_to(message, f"❌ **Error:** {str(e)}", parse_mode='Markdown')
 
-@main_bot.message_handler(func=lambda msg: msg.text == "⏹ 𝑺𝑻𝑶𝑷")
-def stop_scanner(message):
-    global user_sessions
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
-    main_bot.register_next_step_handler(msg1, stop_by_chat)
-
-def stop_by_chat(message):
-    global user_sessions
-    user_chat_id = message.text.strip()
+# ============================================================
+# ⏹ STOP FILE
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "⏹ 𝑺𝑻𝑶𝑷 𝑭𝑰𝑳𝑬")
+def stop_file(message):
+    chat_id = message.chat.id
     
     with lock:
-        if user_chat_id not in user_sessions:
-            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
+        if chat_id not in user_sessions:
+            bot.reply_to(message, "❌ No session found!", parse_mode='Markdown')
             return
-        
-        if not user_sessions[user_chat_id].get('is_running', False):
-            main_bot.reply_to(message, "⚠️ 𝑵𝒐𝒕 𝒓𝒖𝒏𝒏𝒊𝒏𝒈!", reply_markup=main_menu())
-            return
-        
-        user_sessions[user_chat_id]['stop_flag'] = True
-        user_sessions[user_chat_id]['is_running'] = False
+        session = user_sessions[chat_id]
     
-    main_bot.reply_to(message, f"⏹ 𝑺𝒕𝒐𝒑𝒑𝒆𝒅!", reply_markup=main_menu())
+    if not session.is_running:
+        bot.reply_to(message, "⚠️ **No file is running!**", parse_mode='Markdown')
+        return
+    
+    try:
+        session.process.terminate()
+        time.sleep(1)
+        if session.process.poll() is None:
+            session.process.kill()
+        
+        session.is_running = False
+        session.add_log("⏹ File stopped")
+        
+        bot.reply_to(message, "⏹ **File stopped successfully!**", parse_mode='Markdown')
+        
+    except Exception as e:
+        bot.reply_to(message, f"❌ **Stop error:** {str(e)}", parse_mode='Markdown')
 
-@main_bot.message_handler(func=lambda msg: msg.text == "📊 𝑻𝑶𝑻𝑨𝑳 𝑯𝑰𝑻𝑺")
-def total_hits(message):
-    global user_sessions
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
-    main_bot.register_next_step_handler(msg1, show_total_hits)
-
-def show_total_hits(message):
-    global user_sessions
-    user_chat_id = message.text.strip()
+# ============================================================
+# 📋 VIEW LOGS
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
+def view_logs(message):
+    chat_id = message.chat.id
     
     with lock:
-        if user_chat_id not in user_sessions:
-            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
+        if chat_id not in user_sessions:
+            bot.reply_to(message, "❌ No session found!", parse_mode='Markdown')
             return
-        session = user_sessions[user_chat_id]
+        session = user_sessions[chat_id]
+    
+    logs = session.get_logs(20)
+    if not logs:
+        bot.reply_to(message, "📋 **No logs yet.**\n\nRun a file to see output.", parse_mode='Markdown')
+        return
+    
+    bot.reply_to(message, f"📋 **Recent Logs:**\n```\n{logs}\n```", parse_mode='Markdown')
+
+# ============================================================
+# 📊 STATUS
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "📊 𝑺𝑻𝑨𝑻𝑼𝑺")
+def show_status(message):
+    chat_id = message.chat.id
+    
+    with lock:
+        if chat_id not in user_sessions:
+            bot.reply_to(message, "❌ No session found!", parse_mode='Markdown')
+            return
+        session = user_sessions[chat_id]
+    
+    status = "🟢 RUNNING" if session.is_running else "🔴 STOPPED"
+    approved = "✅ Approved" if session.is_approved else "⏳ Pending Approval"
+    file_name = os.path.basename(session.file_path) if session.file_path else "None"
+    
+    runtime = "N/A"
+    if session.start_time and session.is_running:
+        runtime = str(datetime.now() - session.start_time).split('.')[0]
+    elif session.start_time:
+        runtime = str(datetime.now() - session.start_time).split('.')[0]
     
     status_msg = f"""
-┌─────────────────────────────────────────┐
-│  ✦ 𝑺𝑼𝑵𝑹𝑨𝑲𝑼 𝟓𝟎𝟎 𝑩𝑶𝑻 ✦                   │
-├─────────────────────────────────────────┤
-│  ✅ 𝑮𝑶𝑶𝑫  : {session['good']}  🔥 𝑯𝑰𝑻𝑺 : {session['hits']}  ❌ 𝑩𝑨𝑫 : {session['bad']} │
-│  📊 𝑻𝑶𝑻𝑨𝑳 : {session['total']}           │
-│  📧 {session['current_email'][:30]:<30} │
-│  ◈ @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2  ●  @𝑨𝒏𝒊𝒔𝒉𝒑𝒚             │
-└─────────────────────────────────────────┘
+📊 **FILE STATUS**
+
+📁 File: `{file_name}`
+🟢 Status: {status}
+✅ Approval: {approved}
+⏱ Runtime: {runtime}
+📊 Checks: {session.total_checks}
+📈 Speed: {session.speed} checks/min
+📋 Logs: {len(session.logs)} lines
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+👑 @SunrakuV2 | 📢 @Anishpy | @VOUCH_R
 """
-    main_bot.reply_to(message, status_msg, reply_markup=main_menu())
+    bot.reply_to(message, status_msg, parse_mode='Markdown')
 
-@main_bot.message_handler(func=lambda msg: msg.text == "📋 𝑽𝑰𝑬𝑾 𝑨𝑳𝑳")
-def view_all_hits(message):
-    global user_sessions
-    msg1 = main_bot.reply_to(message, "✏️ 𝑬𝒏𝒕𝒆𝒓 𝒚𝒐𝒖𝒓 𝑪𝑯𝑨𝑻 𝑰𝑫:")
-    main_bot.register_next_step_handler(msg1, show_all_hits)
-
-def show_all_hits(message):
-    global user_sessions
-    user_chat_id = message.text.strip()
+# ============================================================
+# ⚡ SPEED
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "⚡ 𝑺𝑷𝑬𝑬𝑫")
+def show_speed(message):
+    chat_id = message.chat.id
     
     with lock:
-        if user_chat_id not in user_sessions:
-            main_bot.reply_to(message, "❌ 𝑵𝒐 𝒔𝒄𝒂𝒏𝒏𝒆𝒓 𝒇𝒐𝒖𝒏𝒅!", reply_markup=main_menu())
+        if chat_id not in user_sessions:
+            bot.reply_to(message, "❌ No session found!", parse_mode='Markdown')
             return
-        hits_list = user_sessions[user_chat_id].get('hits_list', [])
+        session = user_sessions[chat_id]
     
-    if not hits_list:
-        main_bot.reply_to(message, "📋 𝑵𝒐 𝒉𝒊𝒕𝒔 𝒚𝒆𝒕!", reply_markup=main_menu())
+    if not session.is_running:
+        bot.reply_to(message, "⚠️ **No file is running!**", parse_mode='Markdown')
         return
     
-    hit_list = "📋 𝑨𝑳𝑳 𝑯𝑰𝑻𝑺\n━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    for i, hit in enumerate(hits_list, 1):
-        hit_list += f"{i}. @{hit['username']} | {hit['email']} | {hit['followers']} followers\n"
-        if len(hit_list) > 3800:
-            hit_list += "\n... and more!"
-            break
+    if session.start_time:
+        runtime_seconds = (datetime.now() - session.start_time).total_seconds()
+        if runtime_seconds > 0:
+            speed = int((session.total_checks / runtime_seconds) * 60)
+            session.speed = speed
+        else:
+            speed = 0
+    else:
+        speed = 0
     
-    hit_list += f"\n━━━━━━━━━━━━━━━━━━━━━━━━━\n📊 𝑻𝒐𝒕𝒂𝒍: {len(hits_list)} hits"
-    hit_list += "\n👑 @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2 | 📢 @𝑨𝒏𝒊𝒔𝒉𝒑𝒚"
+    speed_msg = f"""
+⚡ **SPEED REPORT**
+
+📊 Total Checks: {session.total_checks}
+⏱ Runtime: {str(datetime.now() - session.start_time).split('.')[0] if session.start_time else 'N/A'}
+⚡ Speed: {speed} checks/min
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+👑 @SunrakuV2 | 📢 @Anishpy | @VOUCH_R
+"""
+    bot.reply_to(message, speed_msg, parse_mode='Markdown')
+
+# ============================================================
+# 👑 DEV
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "👑 𝑫𝑬𝑽")
+def show_dev(message):
+    markup = InlineKeyboardMarkup()
+    btn1 = InlineKeyboardButton("👑 @SunrakuV2", url="https://t.me/SunrakuV2")
+    btn2 = InlineKeyboardButton("📢 @Anishpy", url="https://t.me/Anishpy")
+    btn3 = InlineKeyboardButton("📢 @VOUCH_R", url="https://t.me/VOUCH_R")
+    markup.add(btn1, btn2, btn3)
     
-    main_bot.reply_to(message, hit_list, reply_markup=main_menu())
-
-@main_bot.message_handler(func=lambda msg: msg.text == "📢 𝑪𝑯𝑨𝑵𝑵𝑬𝑳")
-def send_channel(message):
-    markup = InlineKeyboardMarkup()
-    for channel in CHANNELS:
-        btn = InlineKeyboardButton(text=channel["username"], url=f"https://t.me/{channel['username'].replace('@', '')}")
-        markup.add(btn)
-    main_bot.reply_to(message, "📢 𝑱𝒐𝒊𝒏 𝒐𝒖𝒓 𝒄𝒉𝒂𝒏𝒏𝒆𝒍𝒔:", reply_markup=markup)
-
-@main_bot.message_handler(func=lambda msg: msg.text == "👑 𝑫𝑬𝑽")
-def send_dev(message):
-    markup = InlineKeyboardMarkup()
-    btn = InlineKeyboardButton(text="👑 @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2", url="https://t.me/SunrakuV2")
-    markup.add(btn)
-    main_bot.reply_to(message, "👑 𝑫𝒆𝒗𝒆𝒍𝒐𝒑𝒆𝒓:", reply_markup=markup)
-
-@main_bot.message_handler(func=lambda msg: True)
-def echo_all(message):
-    main_bot.reply_to(message, "❌ 𝑼𝒔𝒆 𝒃𝒖𝒕𝒕𝒐𝒏𝒔 👇", reply_markup=main_menu())
+    bot.reply_to(message, "👑 **Developer & Channels:**", reply_markup=markup, parse_mode='Markdown')
 
 # ============================================================
 # 🚀 START BOT
 # ============================================================
-print("✅ Main Bot is running...")
-print("📌 Bot Username: @" + main_bot.get_me().username)
-print("🎉 500 SUBS SPECIAL EDITION")
-print("📌 No force subscribe — sabko access")
+print("✅ Bot is running...")
+print("📌 Bot Username: @" + bot.get_me().username)
+print("🔥 Advanced File Runner Bot Active")
+print(f"👑 Owner Chat ID: {OWNER_CHAT_ID}")
 
 while True:
     try:
-        main_bot.infinity_polling(timeout=10, long_polling_timeout=5)
+        bot.infinity_polling(timeout=10, long_polling_timeout=5)
     except Exception as e:
         print(f"⚠️ Polling error: {e}")
         time.sleep(5)

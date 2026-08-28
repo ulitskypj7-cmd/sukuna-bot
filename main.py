@@ -63,8 +63,6 @@ class UserSession:
         self.end_time = None
         self.speed = 0
         self.total_checks = 0
-        self.user_bot_token = ""
-        self.user_chat_id = ""
         self.installed_packages = []
         self.awaiting_input = False
         self.input_prompt = ""
@@ -124,6 +122,20 @@ def ask_user_for_process_input(session, prompt):
     session.add_log(f"📝 Waiting for input: {prompt}")
 
     try:
+        # Show the complete stored log before asking for the next value.
+        full_log = session.get_logs(200)
+        if not full_log:
+            full_log = "No log output yet."
+        log_chunks = [
+            full_log[i:i + 3500]
+            for i in range(0, len(full_log), 3500)
+        ]
+        for chunk_number, chunk in enumerate(log_chunks, start=1):
+            header = "📋 FULL FILE LOG"
+            if len(log_chunks) > 1:
+                header += f" ({chunk_number}/{len(log_chunks)})"
+            bot.send_message(session.chat_id, f"{header}\n\n{chunk}")
+
         prompt_message = bot.send_message(
             session.chat_id,
             "📝 Your file needs input:\n\n"
@@ -154,10 +166,7 @@ def discover_user_files(session):
         for file_name in os.listdir(UPLOAD_DIR):
             if not file_name.endswith(".py"):
                 continue
-            if not (
-                file_name.startswith(f"{session.chat_id}_")
-                or file_name == f"default_scanner_{session.chat_id}.py"
-            ):
+            if not file_name.startswith(f"{session.chat_id}_"):
                 continue
             file_path = os.path.join(UPLOAD_DIR, file_name)
             if not os.path.isfile(file_path):
@@ -219,83 +228,15 @@ def file_manager_text(session):
     return "\n".join(lines)
 
 # ============================================================
-# 🔥 DEFAULT FILE
-# ============================================================
-DEFAULT_FILE_TEMPLATE = '''#!/usr/bin/env python3
-import requests
-import random
-import time
-import sys
-
-BOT_TOKEN = "{BOT_TOKEN}"
-CHAT_ID = "{CHAT_ID}"
-
-def fast_scanner():
-    print(f"🚀 Scanner started!")
-    print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
-    print(f"📌 Chat ID: {CHAT_ID}")
-    counter = 0
-    while True:
-        try:
-            user_id = random.randint(2500000000, 21254029834)
-            counter += 1
-            print(f"[{counter}] 🔍 Scanning: {user_id}")
-            sys.stdout.flush()
-            time.sleep(0.1)
-        except KeyboardInterrupt:
-            print("\\n⏹ Scanner stopped by user")
-            break
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            time.sleep(1)
-
-if __name__ == "__main__":
-    fast_scanner()
-'''
-
-# ============================================================
-# 🔥 VARIABLE REPLACEMENT SYSTEM
-# ============================================================
-def replace_variables_in_file(file_path, bot_token, chat_id):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # 🔥 Replace variables
-        content = content.replace('"{BOT_TOKEN}"', f'"{bot_token}"')
-        content = content.replace('"{CHAT_ID}"', f'"{chat_id}"')
-        content = content.replace('{BOT_TOKEN}', bot_token)
-        content = content.replace('{CHAT_ID}', chat_id)
-        
-        content = re.sub(r'BOT_TOKEN\s*=\s*"[^"]*"', f'BOT_TOKEN = "{bot_token}"', content)
-        content = re.sub(r"BOT_TOKEN\s*=\s*'[^']*'", f"BOT_TOKEN = '{bot_token}'", content)
-        content = re.sub(r'CHAT_ID\s*=\s*"[^"]*"', f'CHAT_ID = "{chat_id}"', content)
-        content = re.sub(r"CHAT_ID\s*=\s*'[^']*'", f"CHAT_ID = '{chat_id}'", content)
-        
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        
-        return True
-    except Exception as e:
-        print(f"Variable replace error: {e}")
-        return False
-
-# ============================================================
 # 🔥 APPROVAL SYSTEM
 # ============================================================
-def send_approval_request(user_chat_id, file_name, file_path, bot_token="", chat_id=""):
-    token_info = f"🤖 Bot Token: `{bot_token[:10]}...`" if bot_token else "⏳ Pending..."
-    chat_info = f"📌 Chat ID: `{chat_id}`" if chat_id else "⏳ Pending..."
-    
+def send_approval_request(user_chat_id, file_name, file_path):
     msg = f"""
 🔔 **NEW FILE UPLOADED - APPROVAL NEEDED**
 
 👤 User ID: `{user_chat_id}`
 📁 File: `{file_name}`
 📂 Path: `{file_path}`
-
-{token_info}
-{chat_info}
 
 📌 Click Approve to allow user to run this file.
 """
@@ -333,10 +274,6 @@ def approve_file(call):
             if entry.get("path") == file_path:
                 entry["approved"] = True
         session.add_log("✅ File approved by owner")
-    
-    if session.user_bot_token and session.user_chat_id:
-        replace_variables_in_file(file_path, session.user_bot_token, session.user_chat_id)
-        session.add_log("✅ Variables replaced in file")
     
     bot.edit_message_text(
         f"✅ **File Approved!**\n👤 User: `{user_chat_id}`\n📁 File: `{os.path.basename(file_path)}`\n\nUser can now run the file.",
@@ -402,13 +339,12 @@ def main_menu():
     btn4 = KeyboardButton("🟡 📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
     btn5 = KeyboardButton("🟣 📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
     btn6 = KeyboardButton("🟠 ⚡ 𝑺𝑷𝑬𝑬𝑫")
-    btn7 = KeyboardButton("🟤 🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
-    btn8 = KeyboardButton("📦 INSTALL PIP")
-    btn9 = KeyboardButton("📂 MY FILES")
-    btn10 = KeyboardButton("🔹 📝 SEND INPUT")
-    btn11 = KeyboardButton("⚫ 👑 𝑫𝑬𝑽")
+    btn7 = KeyboardButton("📦 INSTALL PIP")
+    btn8 = KeyboardButton("📂 MY FILES")
+    btn9 = KeyboardButton("🔹 📝 SEND INPUT")
+    btn10 = KeyboardButton("⚫ 👑 𝑫𝑬𝑽")
     
-    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11)
+    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10)
     return markup
 
 @bot.message_handler(commands=['start'])
@@ -431,7 +367,6 @@ def send_welcome(message):
 🟡 𝑽𝒊𝒆𝒘 𝒍𝒊𝒗𝒆 𝒍𝒐𝒈𝒔
 🟣 𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔
 🟠 𝑺𝒑𝒆𝒆𝒅
-🟤 𝑹𝒖𝒏 𝒅𝒆𝒇𝒂𝒖𝒍𝒕 𝒇𝒂𝒔𝒕 𝒔𝒄𝒂𝒏𝒏𝒆𝒓
 📦 𝑰𝒏𝒔𝒕𝒂𝒍𝒍 𝒑𝒊𝒑 𝒑𝒂𝒄𝒌𝒂𝒈𝒆𝒔 𝒇𝒐𝒓 𝒚𝒐𝒖𝒓 𝒇𝒊𝒍𝒆 (𝒐𝒓 𝒖𝒔𝒆 /pip)
 📂 𝑴𝒂𝒏𝒂𝒈𝒆 𝒚𝒐𝒖𝒓 𝒖𝒑𝒍𝒐𝒂𝒅𝒆𝒅 𝒇𝒊𝒍𝒆𝒔
 🔹 𝑺𝒆𝒏𝒅 𝒊𝒏𝒑𝒖𝒕 𝒕𝒐 𝒂 𝒓𝒖𝒏𝒏𝒊𝒏𝒈 𝒇𝒊𝒍𝒆 (𝒐𝒓 𝒖𝒔𝒆 /input)
@@ -446,31 +381,14 @@ def send_welcome(message):
 # ============================================================
 @bot.message_handler(func=lambda msg: msg.text == "🟦 📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
 def upload_file(message):
-    msg1 = bot.reply_to(message, "📤 **Send your .py file** (max 5MB)\n\n📌 File will be sent for approval.", parse_mode='Markdown')
-    bot.register_next_step_handler(msg1, get_variables)
-
-def get_variables(message):
-    chat_id = message.chat.id
-    
-    with lock:
-        if chat_id not in user_sessions:
-            user_sessions[chat_id] = UserSession(chat_id)
-        session = user_sessions[chat_id]
-    
-    msg2 = bot.reply_to(message, "🤖 **Enter your BOT TOKEN:**\n\n📌 This will be automatically added to your file.", parse_mode='Markdown')
-    bot.register_next_step_handler(msg2, lambda m: get_chat_id(m, session))
-
-def get_chat_id(message, session):
-    session.user_bot_token = message.text.strip()
-    
-    msg3 = bot.reply_to(message, "📌 **Enter your CHAT ID:**\n\n📌 This will be automatically added to your file.", parse_mode='Markdown')
-    bot.register_next_step_handler(msg3, lambda m: handle_file_upload_with_vars(m, session))
-
-def handle_file_upload_with_vars(message, session):
-    chat_id = message.chat.id
-    session.user_chat_id = message.text.strip()
-    
-    bot.reply_to(message, "✅ **Variables saved!**\n\n📤 Now send your .py file.", parse_mode='Markdown')
+    msg1 = bot.reply_to(
+        message,
+        "📤 **Send your .py file now.**\n\n"
+        "No token or Chat ID is needed here. "
+        "After approval, the file will ask for each input in Telegram.",
+        parse_mode='Markdown'
+    )
+    bot.register_next_step_handler(msg1, handle_file_upload)
 
 # ============================================================
 # 📂 MY FILES
@@ -710,6 +628,11 @@ def install_pip_packages(message):
 @bot.message_handler(content_types=['document'])
 def handle_file_upload(message):
     chat_id = message.chat.id
+    
+    if not message.document:
+        bot.reply_to(message, "❌ **Please send a .py document file.**", parse_mode='Markdown')
+        return
+
     file_id = message.document.file_id
     
     if not message.document.file_name.endswith('.py'):
@@ -743,16 +666,10 @@ def handle_file_upload(message):
         )
         session.add_log(f"📤 File uploaded: {message.document.file_name}")
         
-        if session.user_bot_token and session.user_chat_id:
-            replace_variables_in_file(file_path, session.user_bot_token, session.user_chat_id)
-            session.add_log("✅ Variables replaced in file")
-        
         success = send_approval_request(
             chat_id, 
             message.document.file_name, 
-            file_path,
-            session.user_bot_token,
-            session.user_chat_id
+            file_path
         )
         
         if success:
@@ -762,65 +679,6 @@ def handle_file_upload(message):
         
     except Exception as e:
         bot.reply_to(message, f"❌ **Upload failed:** {str(e)}", parse_mode='Markdown')
-
-# ============================================================
-# 🔥 DEFAULT FILE (Fixed)
-# ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "🟤 🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
-def set_default_file(message):
-    chat_id = message.chat.id
-    
-    with lock:
-        if chat_id not in user_sessions:
-            user_sessions[chat_id] = UserSession(chat_id)
-        session = user_sessions[chat_id]
-    
-    msg1 = bot.reply_to(message, "🤖 **Enter your BOT TOKEN for default file:**", parse_mode='Markdown')
-    bot.register_next_step_handler(msg1, lambda m: get_default_vars(m, session))
-
-def get_default_vars(message, session):
-    session.user_bot_token = message.text.strip()
-    
-    msg2 = bot.reply_to(message, "📌 **Enter your CHAT ID:**", parse_mode='Markdown')
-    bot.register_next_step_handler(msg2, lambda m: set_default_with_vars(m, session))
-
-def set_default_with_vars(message, session):
-    chat_id = message.chat.id
-    session.user_chat_id = message.text.strip()
-    
-    default_path = os.path.join(UPLOAD_DIR, f"default_scanner_{chat_id}.py")
-    
-    # 🔥 Default file with user's variables
-    default_content = DEFAULT_FILE_TEMPLATE.format(
-        BOT_TOKEN=session.user_bot_token,
-        CHAT_ID=session.user_chat_id
-    )
-    
-    with open(default_path, 'w', encoding='utf-8') as f:
-        f.write(default_content)
-    
-    session.file_path = default_path
-    add_file_to_session(
-        session,
-        default_path,
-        "default_scanner.py",
-        approved=False
-    )
-    session.is_approved = False
-    session.add_log("🔥 Default file selected - pending approval")
-    
-    success = send_approval_request(
-        chat_id, 
-        "default_scanner.py", 
-        default_path,
-        session.user_bot_token,
-        session.user_chat_id
-    )
-    
-    if success:
-        bot.reply_to(message, "✅ **Default scanner selected!**\n\n⏳ **Waiting for owner approval...**\nYou will be notified when approved.", parse_mode='Markdown')
-    else:
-        bot.reply_to(message, "⚠️ **Default file selected but approval failed!**\nPlease contact @SunrakuV2.", parse_mode='Markdown')
 
 # ============================================================
 # 🚀 RUN FILE
@@ -835,7 +693,7 @@ def run_file(message):
         session = user_sessions[chat_id]
     
     if not session.is_approved:
-        bot.reply_to(message, "❌ **File not approved!**\n\n📌 Upload a file or select default file.\n⏳ Wait for owner approval.", parse_mode='Markdown')
+        bot.reply_to(message, "❌ **File not approved!**\n\n📌 Upload a file and wait for owner approval.", parse_mode='Markdown')
         return
     
     if session.is_running:
@@ -843,8 +701,8 @@ def run_file(message):
         return
     
     if not session.file_path or not os.path.exists(session.file_path):
-        session.add_log("❌ No file found! Upload or select default.")
-        bot.reply_to(message, "❌ **No file found!**\n\n📤 Upload a .py file\n🔥 Or select **DEFAULT FILE**", parse_mode='Markdown')
+        session.add_log("❌ No file found! Upload a .py file.")
+        bot.reply_to(message, "❌ **No file found!**\n\n📤 Upload a .py file first.", parse_mode='Markdown')
         return
     
     try:
@@ -864,16 +722,6 @@ def run_file(message):
         session.speed = 0
         session.add_log(f"🚀 File started: {os.path.basename(session.file_path)}")
 
-        # Most uploaded files ask for Chat ID first. Feed the value already
-        # collected by the bot so input("CHAT ID") does not raise EOFError.
-        if session.user_chat_id and session.process.stdin:
-            try:
-                session.process.stdin.write(session.user_chat_id + "\n")
-                session.process.stdin.flush()
-                session.add_log("📌 Chat ID sent automatically")
-            except (BrokenPipeError, OSError, ValueError):
-                session.add_log("⚠️ Could not send automatic Chat ID")
-        
         def read_logs():
             # Read one byte at a time so prompts from input("...") are
             # visible even when they do not end with a newline.

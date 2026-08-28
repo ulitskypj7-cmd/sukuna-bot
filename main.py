@@ -48,7 +48,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 OWNER_CHAT_ID = 8641613327
 
 # ============================================================
-# 🔥 USER SESSION MANAGER
+# 🔥 USER SESSION MANAGER (Fully Fixed)
 # ============================================================
 class UserSession:
     def __init__(self, chat_id):
@@ -73,6 +73,56 @@ class UserSession:
     
     def get_logs(self, lines=25):
         return "\n".join(self.logs[-lines:]) if self.logs else "No logs yet."
+    
+    def get_runtime(self):
+        if self.start_time:
+            diff = datetime.now() - self.start_time
+            return str(diff).split('.')[0]
+        return "N/A"
+    
+    def get_speed(self):
+        if self.is_running and self.start_time:
+            runtime_seconds = (datetime.now() - self.start_time).total_seconds()
+            if runtime_seconds > 5:  # Minimum 5 seconds for accurate speed
+                speed = int((self.total_checks / runtime_seconds) * 60)
+                self.speed = speed
+                return speed
+        return self.speed or 0
+
+# ============================================================
+# 🔥 DEFAULT FILE
+# ============================================================
+DEFAULT_FILE_TEMPLATE = '''#!/usr/bin/env python3
+import requests
+import random
+import time
+import sys
+
+BOT_TOKEN = "{BOT_TOKEN}"
+CHAT_ID = "{CHAT_ID}"
+
+def fast_scanner():
+    print(f"🚀 Scanner started!")
+    print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
+    print(f"📌 Chat ID: {CHAT_ID}")
+    counter = 0
+    while True:
+        try:
+            user_id = random.randint(2500000000, 21254029834)
+            counter += 1
+            print(f"[{counter}] 🔍 Scanning: {user_id}")
+            sys.stdout.flush()
+            time.sleep(0.1)
+        except KeyboardInterrupt:
+            print("\\n⏹ Scanner stopped by user")
+            break
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            time.sleep(1)
+
+if __name__ == "__main__":
+    fast_scanner()
+'''
 
 # ============================================================
 # 🔥 VARIABLE REPLACEMENT SYSTEM
@@ -98,6 +148,7 @@ def replace_variables_in_file(file_path, bot_token, chat_id):
         
         return True
     except Exception as e:
+        print(f"Variable replace error: {e}")
         return False
 
 # ============================================================
@@ -329,7 +380,7 @@ def handle_file_upload(message):
         bot.reply_to(message, f"❌ **Upload failed:** {str(e)}", parse_mode='Markdown')
 
 # ============================================================
-# 🔥 DEFAULT FILE
+# 🔥 DEFAULT FILE (Fixed)
 # ============================================================
 @bot.message_handler(func=lambda msg: msg.text == "🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
 def set_default_file(message):
@@ -353,29 +404,13 @@ def set_default_with_vars(message, session):
     chat_id = message.chat.id
     session.user_chat_id = message.text.strip()
     
-    default_path = os.path.join(UPLOAD_DIR, "default_scanner.py")
+    default_path = os.path.join(UPLOAD_DIR, f"default_scanner_{chat_id}.py")
     
-    # 🔥 Default file content with variables
-    default_content = f'''
-#!/usr/bin/env python3
-import requests
-import random
-import time
-
-BOT_TOKEN = "{session.user_bot_token}"
-CHAT_ID = "{session.user_chat_id}"
-
-def fast_scanner():
-    print("Scanner started with BOT_TOKEN: {{BOT_TOKEN[:10]}}...")
-    print("CHAT_ID: {{CHAT_ID}}")
-    while True:
-        user_id = random.randint(2500000000, 21254029834)
-        print(f"Scanning: {{user_id}}")
-        time.sleep(0.1)
-
-if __name__ == "__main__":
-    fast_scanner()
-'''
+    # 🔥 Default file with user's variables
+    default_content = DEFAULT_FILE_TEMPLATE.format(
+        BOT_TOKEN=session.user_bot_token,
+        CHAT_ID=session.user_chat_id
+    )
     
     with open(default_path, 'w', encoding='utf-8') as f:
         f.write(default_content)
@@ -511,45 +546,35 @@ def view_logs(message):
     bot.reply_to(message, f"📋 **Recent Logs:**\n```\n{logs}\n```", parse_mode='Markdown')
 
 # ============================================================
-# 📊 LIVE STATUS (FIXED)
+# 📊 LIVE STATUS (Fixed — Proper Working)
 # ============================================================
 @bot.message_handler(func=lambda msg: msg.text == "📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
-def show_status(message):
+def show_live_status(message):
     chat_id = message.chat.id
     
     with lock:
         if chat_id not in user_sessions:
-            bot.reply_to(message, "❌ No session found!", parse_mode='Markdown')
+            bot.reply_to(message, "❌ **No session found!**\n\n📌 Please /start first.", parse_mode='Markdown')
             return
         session = user_sessions[chat_id]
     
-    status = "🟢 RUNNING" if session.is_running else "🔴 STOPPED"
-    approved = "✅ Approved" if session.is_approved else "⏳ Pending Approval"
+    status_icon = "🟢" if session.is_running else "🔴"
+    status_text = "RUNNING" if session.is_running else "STOPPED"
+    approved_text = "✅ Approved" if session.is_approved else "⏳ Pending Approval"
     file_name = os.path.basename(session.file_path) if session.file_path else "None"
-    
-    runtime = "N/A"
-    if session.start_time:
-        diff = datetime.now() - session.start_time
-        runtime = str(diff).split('.')[0]
-    
-    # Calculate speed
-    speed = session.speed
-    if session.is_running and session.start_time:
-        runtime_seconds = (datetime.now() - session.start_time).total_seconds()
-        if runtime_seconds > 0:
-            speed = int((session.total_checks / runtime_seconds) * 60)
-            session.speed = speed
+    runtime = session.get_runtime()
+    speed = session.get_speed()
     
     status_msg = f"""
 📊 **LIVE STATUS**
 
-📁 File: `{file_name}`
-🟢 Status: {status}
-✅ Approval: {approved}
-⏱ Runtime: {runtime}
-📊 Checks: {session.total_checks}
-📈 Speed: {speed} checks/min
-📋 Logs: {len(session.logs)} lines
+📁 **File:** `{file_name}`
+{status_icon} **Status:** `{status_text}`
+✅ **Approval:** `{approved_text}`
+⏱ **Runtime:** `{runtime}`
+📊 **Checks:** `{session.total_checks}`
+📈 **Speed:** `{speed}` checks/min
+📋 **Logs:** `{len(session.logs)}` lines
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 👑 @SunrakuV2 | 📢 @Anishpy | @VOUCH_R
@@ -557,7 +582,7 @@ def show_status(message):
     bot.reply_to(message, status_msg, parse_mode='Markdown')
 
 # ============================================================
-# ⚡ SPEED (FIXED)
+# ⚡ SPEED (Fixed — Proper Working)
 # ============================================================
 @bot.message_handler(func=lambda msg: msg.text == "⚡ 𝑺𝑷𝑬𝑬𝑫")
 def show_speed(message):
@@ -565,30 +590,25 @@ def show_speed(message):
     
     with lock:
         if chat_id not in user_sessions:
-            bot.reply_to(message, "❌ No session found!", parse_mode='Markdown')
+            bot.reply_to(message, "❌ **No session found!**\n\n📌 Please /start first.", parse_mode='Markdown')
             return
         session = user_sessions[chat_id]
     
     if not session.is_running:
-        bot.reply_to(message, "⚠️ **No file is running!**", parse_mode='Markdown')
+        bot.reply_to(message, "⚠️ **No file is running!**\n\n📌 Start a file first using **RUN FILE**.", parse_mode='Markdown')
         return
     
-    if session.start_time:
-        runtime_seconds = (datetime.now() - session.start_time).total_seconds()
-        if runtime_seconds > 0:
-            speed = int((session.total_checks / runtime_seconds) * 60)
-            session.speed = speed
-        else:
-            speed = 0
-    else:
-        speed = 0
+    runtime = session.get_runtime()
+    speed = session.get_speed()
     
     speed_msg = f"""
 ⚡ **SPEED REPORT**
 
-📊 Total Checks: {session.total_checks}
-⏱ Runtime: {str(datetime.now() - session.start_time).split('.')[0] if session.start_time else 'N/A'}
-⚡ Speed: {speed} checks/min
+📊 **Total Checks:** `{session.total_checks}`
+⏱ **Runtime:** `{runtime}`
+⚡ **Speed:** `{speed}` checks/min
+
+📈 **Performance:** {'🚀 Fast' if speed > 100 else '🐢 Slow' if speed < 30 else '⚡ Average'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 👑 @SunrakuV2 | 📢 @Anishpy | @VOUCH_R

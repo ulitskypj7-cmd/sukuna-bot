@@ -18,6 +18,7 @@ import time
 import random
 import json
 import re
+import select
 import requests
 import threading
 import subprocess
@@ -65,6 +66,9 @@ class UserSession:
         self.user_bot_token = ""
         self.user_chat_id = ""
         self.installed_packages = []
+        self.awaiting_input = False
+        self.input_prompt = ""
+        self.files = []
         self.lock = threading.Lock()
     
     def add_log(self, msg):
@@ -91,6 +95,128 @@ class UserSession:
             self.speed = speed
             return speed
         return self.speed or 0
+
+ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+INPUT_PROMPT_RE = re.compile(
+    r"(chat\s*id|user\s*name|username|password|token|email|phone|"
+    r"number|choice|select|option|proxy|path|file|url|key|code|"
+    r"confirm|yes/no|enter|input|➜|:\s*$)",
+    re.IGNORECASE
+)
+
+def clean_console_prompt(text):
+    """Remove ANSI styling before sending a terminal prompt to Telegram."""
+    text = ANSI_ESCAPE_RE.sub("", text)
+    text = text.replace("\x00", "").strip()
+    return text[-700:] if len(text) > 700 else text
+
+def looks_like_input_prompt(text):
+    return bool(text and INPUT_PROMPT_RE.search(text))
+
+def ask_user_for_process_input(session, prompt):
+    """Forward an interactive child-process prompt to the user's Telegram chat."""
+    prompt = clean_console_prompt(prompt)
+    if not prompt or session.awaiting_input:
+        return
+
+    session.awaiting_input = True
+    session.input_prompt = prompt
+    session.add_log(f"📝 Waiting for input: {prompt}")
+
+    try:
+        prompt_message = bot.send_message(
+            session.chat_id,
+            "📝 Your file needs input:\n\n"
+            f"{prompt}\n\n"
+            "Reply to this message with the value. "
+            "I will send it to the running file automatically.",
+        )
+        bot.register_next_step_handler(prompt_message, send_process_input)
+    except Exception as e:
+        session.awaiting_input = False
+        session.add_log(f"❌ Could not request input: {e}")
+
+def add_file_to_session(session, file_path, file_name, approved=False):
+    """Add or replace a file record for this user's file list."""
+    session.files = [
+        entry for entry in session.files
+        if entry.get("path") != file_path
+    ]
+    session.files.append({
+        "path": file_path,
+        "name": file_name,
+        "approved": approved
+    })
+
+def discover_user_files(session):
+    """Restore this user's uploaded files after a bot restart."""
+    try:
+        for file_name in os.listdir(UPLOAD_DIR):
+            if not file_name.endswith(".py"):
+                continue
+            if not (
+                file_name.startswith(f"{session.chat_id}_")
+                or file_name == f"default_scanner_{session.chat_id}.py"
+            ):
+                continue
+            file_path = os.path.join(UPLOAD_DIR, file_name)
+            if not os.path.isfile(file_path):
+                continue
+            if not any(entry.get("path") == file_path for entry in session.files):
+                add_file_to_session(session, file_path, file_name, approved=False)
+    except OSError:
+        pass
+
+def get_file_entry(session, index):
+    if index < 0 or index >= len(session.files):
+        return None
+    entry = session.files[index]
+    if not os.path.exists(entry.get("path", "")):
+        return None
+    return entry
+
+def file_manager_markup(session):
+    markup = InlineKeyboardMarkup(row_width=2)
+    for index, entry in enumerate(session.files):
+        if not os.path.exists(entry.get("path", "")):
+            continue
+        selected = "⭐ " if entry.get("path") == session.file_path else ""
+        approved = "✅" if entry.get("approved") else "⏳"
+        label = f"{approved} {selected}{index + 1}. {entry.get('name', 'file')}"
+        markup.add(
+            InlineKeyboardButton(
+                label[:60],
+                callback_data=f"select_file_{session.chat_id}_{index}"
+            ),
+            InlineKeyboardButton(
+                "🗑 DELETE",
+                callback_data=f"delete_file_{session.chat_id}_{index}"
+            )
+        )
+    return markup
+
+def file_manager_text(session):
+    existing = [
+        entry for entry in session.files
+        if os.path.exists(entry.get("path", ""))
+    ]
+    if not existing:
+        return (
+            "📂 MY FILES\n\n"
+            "No uploaded files found.\n"
+            "Use UPLOAD FILE to add one."
+        )
+
+    lines = ["📂 MY FILES", "", "Tap a file button to select it:"]
+    for index, entry in enumerate(session.files):
+        if not os.path.exists(entry.get("path", "")):
+            continue
+        selected = " ⭐ SELECTED" if entry.get("path") == session.file_path else ""
+        status = "APPROVED" if entry.get("approved") else "PENDING"
+        lines.append(f"{index + 1}. {entry.get('name', 'file')} — {status}{selected}")
+    lines.append("")
+    lines.append("Selected file can be run with RUN FILE.")
+    return "\n".join(lines)
 
 # ============================================================
 # 🔥 DEFAULT FILE
@@ -203,6 +329,9 @@ def approve_file(call):
             return
         session = user_sessions[user_chat_id]
         session.is_approved = True
+        for entry in session.files:
+            if entry.get("path") == file_path:
+                entry["approved"] = True
         session.add_log("✅ File approved by owner")
     
     if session.user_bot_token and session.user_chat_id:
@@ -235,6 +364,9 @@ def reject_file(call):
         if user_chat_id in user_sessions:
             session = user_sessions[user_chat_id]
             session.is_approved = False
+            for entry in session.files:
+                if entry.get("path") == session.file_path:
+                    entry["approved"] = False
             session.add_log("❌ File rejected by owner")
     
     bot.edit_message_text(
@@ -272,9 +404,11 @@ def main_menu():
     btn6 = KeyboardButton("🟠 ⚡ 𝑺𝑷𝑬𝑬𝑫")
     btn7 = KeyboardButton("🟤 🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
     btn8 = KeyboardButton("📦 INSTALL PIP")
-    btn9 = KeyboardButton("⚫ 👑 𝑫𝑬𝑽")
+    btn9 = KeyboardButton("📂 MY FILES")
+    btn10 = KeyboardButton("🔹 📝 SEND INPUT")
+    btn11 = KeyboardButton("⚫ 👑 𝑫𝑬𝑽")
     
-    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9)
+    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11)
     return markup
 
 @bot.message_handler(commands=['start'])
@@ -299,6 +433,8 @@ def send_welcome(message):
 🟠 𝑺𝒑𝒆𝒆𝒅
 🟤 𝑹𝒖𝒏 𝒅𝒆𝒇𝒂𝒖𝒍𝒕 𝒇𝒂𝒔𝒕 𝒔𝒄𝒂𝒏𝒏𝒆𝒓
 📦 𝑰𝒏𝒔𝒕𝒂𝒍𝒍 𝒑𝒊𝒑 𝒑𝒂𝒄𝒌𝒂𝒈𝒆𝒔 𝒇𝒐𝒓 𝒚𝒐𝒖𝒓 𝒇𝒊𝒍𝒆 (𝒐𝒓 𝒖𝒔𝒆 /pip)
+📂 𝑴𝒂𝒏𝒂𝒈𝒆 𝒚𝒐𝒖𝒓 𝒖𝒑𝒍𝒐𝒂𝒅𝒆𝒅 𝒇𝒊𝒍𝒆𝒔
+🔹 𝑺𝒆𝒏𝒅 𝒊𝒏𝒑𝒖𝒕 𝒕𝒐 𝒂 𝒓𝒖𝒏𝒏𝒊𝒏𝒈 𝒇𝒊𝒍𝒆 (𝒐𝒓 𝒖𝒔𝒆 /input)
 
 👑 𝑫𝒆𝒗: @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2
 📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍: @𝑨𝒏𝒊𝒔𝒉𝒑𝒚 | @𝑽𝑶𝑼𝑪𝑯_𝑹
@@ -335,6 +471,130 @@ def handle_file_upload_with_vars(message, session):
     session.user_chat_id = message.text.strip()
     
     bot.reply_to(message, "✅ **Variables saved!**\n\n📤 Now send your .py file.", parse_mode='Markdown')
+
+# ============================================================
+# 📂 MY FILES
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "📂 MY FILES")
+def show_my_files(message):
+    chat_id = message.chat.id
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+        session = user_sessions[chat_id]
+
+    discover_user_files(session)
+    bot.reply_to(
+        message,
+        file_manager_text(session),
+        reply_markup=file_manager_markup(session)
+    )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("select_file_"))
+def select_user_file(call):
+    try:
+        parts = call.data.split("_")
+        requested_chat_id = int(parts[-2])
+        file_index = int(parts[-1])
+    except (ValueError, IndexError):
+        bot.answer_callback_query(call.id, "❌ Invalid file selection.")
+        return
+
+    if call.message.chat.id != requested_chat_id:
+        bot.answer_callback_query(call.id, "❌ This file menu is not yours.")
+        return
+
+    session = user_sessions.get(requested_chat_id)
+    if not session:
+        bot.answer_callback_query(call.id, "❌ Session not found.")
+        return
+    if session.is_running:
+        bot.answer_callback_query(call.id, "⏹ Stop the running file first.")
+        return
+
+    entry = get_file_entry(session, file_index)
+    if not entry:
+        bot.answer_callback_query(call.id, "❌ File no longer exists.")
+        return
+
+    session.file_path = entry["path"]
+    session.is_approved = bool(entry.get("approved"))
+    session.start_time = None
+    session.end_time = None
+    session.total_checks = 0
+    session.speed = 0
+    session.add_log(f"📂 Selected file: {entry.get('name', 'file')}")
+
+    bot.answer_callback_query(call.id, "✅ File selected.")
+    bot.edit_message_text(
+        file_manager_text(session),
+        call.message.chat.id,
+        call.message.message_id,
+        reply_markup=file_manager_markup(session)
+    )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("delete_file_"))
+def delete_user_file(call):
+    try:
+        parts = call.data.split("_")
+        requested_chat_id = int(parts[-2])
+        file_index = int(parts[-1])
+    except (ValueError, IndexError):
+        bot.answer_callback_query(call.id, "❌ Invalid file selection.")
+        return
+
+    if call.message.chat.id != requested_chat_id:
+        bot.answer_callback_query(call.id, "❌ This file menu is not yours.")
+        return
+
+    session = user_sessions.get(requested_chat_id)
+    if not session:
+        bot.answer_callback_query(call.id, "❌ Session not found.")
+        return
+
+    entry = get_file_entry(session, file_index)
+    if not entry:
+        bot.answer_callback_query(call.id, "❌ File no longer exists.")
+        return
+    if session.is_running and entry["path"] == session.file_path:
+        bot.answer_callback_query(call.id, "⏹ Stop this file before deleting it.")
+        return
+
+    file_path = os.path.abspath(entry["path"])
+    upload_root = os.path.abspath(UPLOAD_DIR) + os.sep
+    if not file_path.startswith(upload_root):
+        bot.answer_callback_query(call.id, "❌ Unsafe file path.")
+        return
+
+    try:
+        os.remove(file_path)
+        deleted_name = entry.get("name", "file")
+        was_selected = session.file_path == entry["path"]
+        session.files.pop(file_index)
+
+        if was_selected:
+            session.file_path = None
+            session.is_approved = False
+            session.start_time = None
+            session.end_time = None
+            session.total_checks = 0
+            session.speed = 0
+            for fallback in reversed(session.files):
+                if os.path.exists(fallback.get("path", "")):
+                    session.file_path = fallback["path"]
+                    session.is_approved = bool(fallback.get("approved"))
+                    break
+
+        session.add_log(f"🗑 Deleted file: {deleted_name}")
+        bot.answer_callback_query(call.id, "🗑 File deleted.")
+        bot.edit_message_text(
+            file_manager_text(session),
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=file_manager_markup(session)
+        )
+    except OSError as e:
+        bot.answer_callback_query(call.id, f"❌ Delete failed: {e}")
 
 # ============================================================
 # 📦 INSTALL PIP PACKAGE FOR USER FILE
@@ -475,6 +735,12 @@ def handle_file_upload(message):
             f.write(downloaded_file)
         
         session.file_path = file_path
+        add_file_to_session(
+            session,
+            file_path,
+            message.document.file_name,
+            approved=False
+        )
         session.add_log(f"📤 File uploaded: {message.document.file_name}")
         
         if session.user_bot_token and session.user_chat_id:
@@ -534,6 +800,12 @@ def set_default_with_vars(message, session):
         f.write(default_content)
     
     session.file_path = default_path
+    add_file_to_session(
+        session,
+        default_path,
+        "default_scanner.py",
+        approved=False
+    )
     session.is_approved = False
     session.add_log("🔥 Default file selected - pending approval")
     
@@ -581,6 +853,7 @@ def run_file(message):
             [sys.executable, "-u", session.file_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE,
             text=True,
             bufsize=1
         )
@@ -590,26 +863,73 @@ def run_file(message):
         session.total_checks = 0
         session.speed = 0
         session.add_log(f"🚀 File started: {os.path.basename(session.file_path)}")
+
+        # Most uploaded files ask for Chat ID first. Feed the value already
+        # collected by the bot so input("CHAT ID") does not raise EOFError.
+        if session.user_chat_id and session.process.stdin:
+            try:
+                session.process.stdin.write(session.user_chat_id + "\n")
+                session.process.stdin.flush()
+                session.add_log("📌 Chat ID sent automatically")
+            except (BrokenPipeError, OSError, ValueError):
+                session.add_log("⚠️ Could not send automatic Chat ID")
         
         def read_logs():
-            # Keep reading until the process really exits. The old loop
-            # depended on is_running and could leave status stuck at RUNNING.
+            # Read one byte at a time so prompts from input("...") are
+            # visible even when they do not end with a newline.
+            stdout = session.process.stdout
+            partial_output = ""
+            prompt_sent = False
+
             while True:
                 try:
-                    output = session.process.stdout.readline()
-                    if output:
-                        session.add_log(output.strip())
-                        session.total_checks += 1
-                        continue
+                    if stdout is None:
+                        break
+
+                    ready, _, _ = select.select([stdout], [], [], 0.25)
+                    if ready:
+                        chunk = os.read(stdout.fileno(), 4096)
+                        if not chunk:
+                            break
+
+                        text = chunk.decode("utf-8", errors="replace")
+                        partial_output += text
+                        prompt_sent = False
+
+                        # Store complete output lines as logs.
+                        while "\n" in partial_output:
+                            line, partial_output = partial_output.split("\n", 1)
+                            line = line.rstrip("\r")
+                            if line.strip():
+                                session.add_log(line.strip())
+                                session.total_checks += 1
+                    else:
+                        # input("...") usually leaves its prompt in the
+                        # partial buffer because there is no newline.
+                        prompt = clean_console_prompt(partial_output)
+                        if (
+                            prompt
+                            and not prompt_sent
+                            and session.process.poll() is None
+                            and looks_like_input_prompt(prompt)
+                        ):
+                            ask_user_for_process_input(session, prompt)
+                            partial_output = ""
+                            prompt_sent = True
 
                     if session.process.poll() is not None:
                         break
-                    time.sleep(0.05)
                 except Exception as e:
                     session.add_log(f"⚠️ Log reader error: {e}")
                     break
+
+            remaining = clean_console_prompt(partial_output)
+            if remaining and not session.awaiting_input:
+                session.add_log(remaining)
             
             return_code = session.process.poll()
+            session.awaiting_input = False
+            session.input_prompt = ""
             session.is_running = False
             session.end_time = datetime.now()
             if return_code == 0:
@@ -703,6 +1023,7 @@ def show_live_status(message):
     file_name = os.path.basename(session.file_path) if session.file_path else "None"
     runtime = session.get_runtime()
     speed = session.get_speed()
+    input_state = "📝 Waiting for your reply" if session.awaiting_input else "No"
     
     status_msg = f"""
 📊 **LIVE STATUS**
@@ -713,6 +1034,7 @@ def show_live_status(message):
 ⏱ **Runtime:** `{runtime}`
 📊 **Checks:** `{session.total_checks}`
 📈 **Speed:** `{speed}` checks/min
+📝 **Input:** `{input_state}`
 📋 **Logs:** `{len(session.logs)}` lines
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -759,6 +1081,66 @@ def show_speed(message):
 👑 @SunrakuV2 | 📢 @Anishpy | @VOUCH_R
 """
     bot.reply_to(message, speed_msg, parse_mode='Markdown')
+
+# ============================================================
+# 📝 PROCESS INPUT
+# ============================================================
+@bot.message_handler(func=lambda msg: msg.text == "🔹 📝 SEND INPUT")
+@bot.message_handler(commands=['input'])
+def request_process_input(message):
+    chat_id = message.chat.id
+    with lock:
+        session = user_sessions.get(chat_id)
+
+    if not session or not session.process or not session.is_running:
+        bot.reply_to(
+            message,
+            "⚠️ **No running file is waiting for input.**",
+            parse_mode='Markdown'
+        )
+        return
+
+    prompt = bot.reply_to(
+        message,
+        "📝 **Send the next input value for your running file.**\n\n"
+        "The value will be sent to its `input()` prompt.\n"
+        "Type `/cancel` to cancel.",
+        parse_mode='Markdown'
+    )
+    session.awaiting_input = True
+    session.input_prompt = "Manual input requested"
+    bot.register_next_step_handler(prompt, send_process_input)
+
+def send_process_input(message):
+    chat_id = message.chat.id
+    with lock:
+        session = user_sessions.get(chat_id)
+
+    if not session or not session.process or not session.is_running:
+        bot.reply_to(message, "⚠️ **The file is no longer running.**", parse_mode='Markdown')
+        return
+
+    value = message.text or ""
+    if value.strip().lower() == "/cancel":
+        bot.reply_to(message, "❎ **Input cancelled.**", parse_mode='Markdown')
+        return
+
+    try:
+        if session.process.stdin is None:
+            raise RuntimeError("stdin pipe is not available")
+        session.process.stdin.write(value + "\n")
+        session.process.stdin.flush()
+        session.awaiting_input = False
+        session.input_prompt = ""
+        session.add_log("📝 Input sent from Telegram")
+        bot.reply_to(message, "✅ **Input sent to the running file.**", parse_mode='Markdown')
+    except (BrokenPipeError, OSError, ValueError) as e:
+        session.awaiting_input = False
+        session.input_prompt = ""
+        session.is_running = False
+        session.end_time = session.end_time or datetime.now()
+        session.add_log(f"❌ Input error: {e}")
+        bot.reply_to(message, "❌ **File closed its input channel or has stopped.**", parse_mode='Markdown')
 
 # ============================================================
 # 👑 DEV

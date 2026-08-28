@@ -64,6 +64,7 @@ class UserSession:
         self.total_checks = 0
         self.user_bot_token = ""
         self.user_chat_id = ""
+        self.installed_packages = []
         self.lock = threading.Lock()
     
     def add_log(self, msg):
@@ -261,16 +262,19 @@ def reject_file(call):
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     
-    btn1 = KeyboardButton("📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
-    btn2 = KeyboardButton("🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
-    btn3 = KeyboardButton("⏹ 𝑺𝑻𝑶𝑷 𝑭𝑰𝑳𝑬")
-    btn4 = KeyboardButton("📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
-    btn5 = KeyboardButton("📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
-    btn6 = KeyboardButton("⚡ 𝑺𝑷𝑬𝑬𝑫")
-    btn7 = KeyboardButton("🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
-    btn8 = KeyboardButton("👑 𝑫𝑬𝑽")
+    # Telegram does not support custom button colors, so colored emoji
+    # markers are used to make every button visually distinct.
+    btn1 = KeyboardButton("🟦 📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
+    btn2 = KeyboardButton("🟢 🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
+    btn3 = KeyboardButton("🔴 ⏹ 𝑺𝑻𝑶𝑷 𝑭𝑰𝑳𝑬")
+    btn4 = KeyboardButton("🟡 📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
+    btn5 = KeyboardButton("🟣 📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
+    btn6 = KeyboardButton("🟠 ⚡ 𝑺𝑷𝑬𝑬𝑫")
+    btn7 = KeyboardButton("🟤 🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
+    btn8 = KeyboardButton("📦 INSTALL PIP")
+    btn9 = KeyboardButton("⚫ 👑 𝑫𝑬𝑽")
     
-    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8)
+    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9)
     return markup
 
 @bot.message_handler(commands=['start'])
@@ -288,12 +292,13 @@ def send_welcome(message):
 📌 **File Upload requires approval!**
    Owner will approve before you can run.
 
-📤 𝑼𝒑𝒍𝒐𝒂𝒅 𝒚𝒐𝒖𝒓 .𝒑𝒚 𝒇𝒊𝒍𝒆
-🚀 𝑹𝒖𝒏 𝒂𝒑𝒑𝒓𝒐𝒗𝒆𝒅 𝒇𝒊𝒍𝒆
-📋 𝑽𝒊𝒆𝒘 𝒍𝒊𝒗𝒆 𝒍𝒐𝒈𝒔
-📊 𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔
-⚡ 𝑺𝒑𝒆𝒆𝒅
-🔥 𝑹𝒖𝒏 𝒅𝒆𝒇𝒂𝒖𝒍𝒕 𝒇𝒂𝒔𝒕 𝒔𝒄𝒂𝒏𝒏𝒆𝒓
+🟦 𝑼𝒑𝒍𝒐𝒂𝒅 𝒚𝒐𝒖𝒓 .𝒑𝒚 𝒇𝒊𝒍𝒆
+🟢 𝑹𝒖𝒏 𝒂𝒑𝒑𝒓𝒐𝒗𝒆𝒅 𝒇𝒊𝒍𝒆
+🟡 𝑽𝒊𝒆𝒘 𝒍𝒊𝒗𝒆 𝒍𝒐𝒈𝒔
+🟣 𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔
+🟠 𝑺𝒑𝒆𝒆𝒅
+🟤 𝑹𝒖𝒏 𝒅𝒆𝒇𝒂𝒖𝒍𝒕 𝒇𝒂𝒔𝒕 𝒔𝒄𝒂𝒏𝒏𝒆𝒓
+📦 𝑰𝒏𝒔𝒕𝒂𝒍𝒍 𝒑𝒊𝒑 𝒑𝒂𝒄𝒌𝒂𝒈𝒆𝒔 𝒇𝒐𝒓 𝒚𝒐𝒖𝒓 𝒇𝒊𝒍𝒆 (𝒐𝒓 𝒖𝒔𝒆 /pip)
 
 👑 𝑫𝒆𝒗: @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2
 📢 𝑪𝒉𝒂𝒏𝒏𝒆𝒍: @𝑨𝒏𝒊𝒔𝒉𝒑𝒚 | @𝑽𝑶𝑼𝑪𝑯_𝑹
@@ -303,7 +308,7 @@ def send_welcome(message):
 # ============================================================
 # 📤 UPLOAD FILE
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
+@bot.message_handler(func=lambda msg: msg.text == "🟦 📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
 def upload_file(message):
     msg1 = bot.reply_to(message, "📤 **Send your .py file** (max 5MB)\n\n📌 File will be sent for approval.", parse_mode='Markdown')
     bot.register_next_step_handler(msg1, get_variables)
@@ -330,6 +335,117 @@ def handle_file_upload_with_vars(message, session):
     session.user_chat_id = message.text.strip()
     
     bot.reply_to(message, "✅ **Variables saved!**\n\n📤 Now send your .py file.", parse_mode='Markdown')
+
+# ============================================================
+# 📦 INSTALL PIP PACKAGE FOR USER FILE
+# ============================================================
+PACKAGE_SPEC_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9_,.-]+\])?"
+    r"(?:(?:==|!=|~=|>=|<=|>|<)[A-Za-z0-9.*+!_-]+)?$"
+)
+
+@bot.message_handler(commands=['pip'])
+@bot.message_handler(func=lambda msg: msg.text in ["📦 INSTALL PIP", "🔷 📦 𝑰𝑵𝑺𝑻𝑨𝑳𝑳 𝑷𝑰𝑷"])
+def install_pip_button(message):
+    chat_id = message.chat.id
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+        session = user_sessions[chat_id]
+
+    if not session.file_path or not os.path.exists(session.file_path):
+        bot.reply_to(
+            message,
+            "📁 **Pehle apni .py file upload ya select karo.**\n\n"
+            "Uske baad is button se us file ki requirements install kar sakte ho.",
+            parse_mode='Markdown'
+        )
+        return
+
+    prompt = bot.reply_to(
+        message,
+        f"📦 **Packages for:** `{os.path.basename(session.file_path)}`\n\n"
+        "Package names space se separate karke bhejo.\n\n"
+        "Example:\n`requests pyTelegramBotAPI`\n"
+        "or:\n`requests==2.32.3`\n\n"
+        "Type `/cancel` to cancel.",
+        parse_mode='Markdown'
+    )
+    bot.register_next_step_handler(prompt, install_pip_packages)
+
+def install_pip_packages(message):
+    chat_id = message.chat.id
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+        session = user_sessions[chat_id]
+
+    if not session.file_path or not os.path.exists(session.file_path):
+        bot.reply_to(message, "📁 **File not found. Upload/select your file first.**", parse_mode='Markdown')
+        return
+
+    package_text = (message.text or "").strip()
+    if package_text.lower() == "/cancel":
+        bot.reply_to(message, "❎ **Pip installation cancelled.**", parse_mode='Markdown')
+        return
+
+    packages = package_text.split()
+    if not packages:
+        bot.reply_to(message, "❌ **No package name received.**", parse_mode='Markdown')
+        return
+
+    if len(packages) > 20 or any(not PACKAGE_SPEC_RE.fullmatch(pkg) for pkg in packages):
+        bot.reply_to(
+            message,
+            "❌ **Invalid package list.**\n\n"
+            "Use normal PyPI names only, for example:\n"
+            "`requests flask==3.0.3`",
+            parse_mode='Markdown'
+        )
+        return
+
+    package_list = " ".join(packages)
+    bot.reply_to(
+        message,
+        f"⏳ **Installing:** `{package_list}`\n\nPlease wait...",
+        parse_mode='Markdown'
+    )
+
+    def pip_worker():
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    *packages
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180
+            )
+            output = (result.stdout or "") + (result.stderr or "")
+            output = output.strip() or "No output returned."
+            if len(output) > 3500:
+                output = output[-3500:]
+
+            if result.returncode == 0:
+                title = "✅ Pip installation completed."
+                session.installed_packages.extend(packages)
+                session.add_log(f"📦 Packages installed: {package_list}")
+            else:
+                title = f"❌ Pip installation failed (exit code {result.returncode})."
+                session.add_log(f"❌ Pip installation failed: {package_list}")
+
+            bot.send_message(message.chat.id, f"{title}\n\n{output}")
+        except subprocess.TimeoutExpired:
+            bot.send_message(message.chat.id, "⏱️ Pip installation timed out after 180 seconds.")
+        except Exception as e:
+            bot.send_message(message.chat.id, f"❌ Pip error: {e}")
+
+    threading.Thread(target=pip_worker, daemon=True).start()
 
 @bot.message_handler(content_types=['document'])
 def handle_file_upload(message):
@@ -384,7 +500,7 @@ def handle_file_upload(message):
 # ============================================================
 # 🔥 DEFAULT FILE (Fixed)
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
+@bot.message_handler(func=lambda msg: msg.text == "🟤 🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
 def set_default_file(message):
     chat_id = message.chat.id
     
@@ -437,7 +553,7 @@ def set_default_with_vars(message, session):
 # ============================================================
 # 🚀 RUN FILE
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
+@bot.message_handler(func=lambda msg: msg.text == "🟢 🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
 def run_file(message):
     chat_id = message.chat.id
     
@@ -513,7 +629,7 @@ def run_file(message):
 # ============================================================
 # ⏹ STOP FILE
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "⏹ 𝑺𝑻𝑶𝑷 𝑭𝑰𝑳𝑬")
+@bot.message_handler(func=lambda msg: msg.text == "🔴 ⏹ 𝑺𝑻𝑶𝑷 𝑭𝑰𝑳𝑬")
 def stop_file(message):
     chat_id = message.chat.id
     
@@ -546,7 +662,7 @@ def stop_file(message):
 # ============================================================
 # 📋 VIEW LOGS
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
+@bot.message_handler(func=lambda msg: msg.text == "🟡 📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
 def view_logs(message):
     chat_id = message.chat.id
     
@@ -566,7 +682,7 @@ def view_logs(message):
 # ============================================================
 # 📊 LIVE STATUS (Fixed — Proper Working)
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
+@bot.message_handler(func=lambda msg: msg.text == "🟣 📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
 def show_live_status(message):
     chat_id = message.chat.id
     
@@ -607,7 +723,7 @@ def show_live_status(message):
 # ============================================================
 # ⚡ SPEED (Fixed — Proper Working)
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "⚡ 𝑺𝑷𝑬𝑬𝑫")
+@bot.message_handler(func=lambda msg: msg.text == "🟠 ⚡ 𝑺𝑷𝑬𝑬𝑫")
 def show_speed(message):
     chat_id = message.chat.id
     
@@ -647,7 +763,7 @@ def show_speed(message):
 # ============================================================
 # 👑 DEV
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "👑 𝑫𝑬𝑽")
+@bot.message_handler(func=lambda msg: msg.text == "⚫ 👑 𝑫𝑬𝑽")
 def show_dev(message):
     markup = InlineKeyboardMarkup()
     btn1 = InlineKeyboardButton("👑 @SunrakuV2", url="https://t.me/SunrakuV2")

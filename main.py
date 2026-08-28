@@ -7,6 +7,7 @@
 - Bot automatically BOT_TOKEN + CHAT_ID replace karega
 - Approval system (owner approve karega)
 - Run/Stop/Logs/Status/Speed controls
+- LIVE STATUS + SPEED FIXED
 - Default file (fast hits) bhi available
 - Dev: @SunrakuV2 | Channel: @Anishpy | @VOUCH_R
 """
@@ -46,35 +47,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # 🔥 Owner Chat ID (Approval ke liye)
 OWNER_CHAT_ID = 8641613327
 
-# 🔥 Pending approvals
-pending_approvals = {}  # {user_chat_id: {"file_path": path, "file_name": name, "user_id": user_id, "bot_token": "", "chat_id": ""}}
-
-# ============================================================
-# 🔥 DEFAULT FILE (Fast Hits Wali)
-# ============================================================
-DEFAULT_FILE = """
-#!/usr/bin/env python3
-import requests
-import random
-import time
-
-BOT_TOKEN = "{BOT_TOKEN}"
-CHAT_ID = "{CHAT_ID}"
-
-def fast_scanner():
-    while True:
-        user_id = random.randint(2500000000, 21254029834)
-        print(f"Scanning: {user_id}")
-        time.sleep(0.1)
-
-if __name__ == "__main__":
-    fast_scanner()
-"""
-
-# Save default file
-with open(os.path.join(UPLOAD_DIR, "default_scanner.py"), "w") as f:
-    f.write(DEFAULT_FILE)
-
 # ============================================================
 # 🔥 USER SESSION MANAGER
 # ============================================================
@@ -96,17 +68,16 @@ class UserSession:
     def add_log(self, msg):
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.logs.append(f"[{timestamp}] {msg}")
-        if len(self.logs) > 100:
+        if len(self.logs) > 200:
             self.logs.pop(0)
     
-    def get_logs(self, lines=20):
+    def get_logs(self, lines=25):
         return "\n".join(self.logs[-lines:]) if self.logs else "No logs yet."
 
 # ============================================================
 # 🔥 VARIABLE REPLACEMENT SYSTEM
 # ============================================================
 def replace_variables_in_file(file_path, bot_token, chat_id):
-    """File mein BOT_TOKEN aur CHAT_ID replace karo"""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -117,7 +88,6 @@ def replace_variables_in_file(file_path, bot_token, chat_id):
         content = content.replace('{BOT_TOKEN}', bot_token)
         content = content.replace('{CHAT_ID}', chat_id)
         
-        # 🔥 Common patterns
         content = re.sub(r'BOT_TOKEN\s*=\s*"[^"]*"', f'BOT_TOKEN = "{bot_token}"', content)
         content = re.sub(r"BOT_TOKEN\s*=\s*'[^']*'", f"BOT_TOKEN = '{bot_token}'", content)
         content = re.sub(r'CHAT_ID\s*=\s*"[^"]*"', f'CHAT_ID = "{chat_id}"', content)
@@ -134,7 +104,6 @@ def replace_variables_in_file(file_path, bot_token, chat_id):
 # 🔥 APPROVAL SYSTEM
 # ============================================================
 def send_approval_request(user_chat_id, file_name, file_path, bot_token="", chat_id=""):
-    """Owner ko approval request bhejo"""
     token_info = f"🤖 Bot Token: `{bot_token[:10]}...`" if bot_token else "⏳ Pending..."
     chat_info = f"📌 Chat ID: `{chat_id}`" if chat_id else "⏳ Pending..."
     
@@ -170,7 +139,6 @@ def send_approval_request(user_chat_id, file_name, file_path, bot_token="", chat
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("approve_"))
 def approve_file(call):
-    """Owner ne approve kiya"""
     data = call.data.split("_")
     user_chat_id = int(data[1])
     file_path = "_".join(data[2:])
@@ -183,7 +151,6 @@ def approve_file(call):
         session.is_approved = True
         session.add_log("✅ File approved by owner")
     
-    # 🔥 Variables replace karo (agar user ne diye hain)
     if session.user_bot_token and session.user_chat_id:
         replace_variables_in_file(file_path, session.user_bot_token, session.user_chat_id)
         session.add_log("✅ Variables replaced in file")
@@ -195,7 +162,6 @@ def approve_file(call):
         parse_mode='Markdown'
     )
     
-    # User ko notify karo
     try:
         bot.send_message(
             user_chat_id,
@@ -209,7 +175,6 @@ def approve_file(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("reject_"))
 def reject_file(call):
-    """Owner ne reject kiya"""
     user_chat_id = int(call.data.split("_")[1])
     
     with lock:
@@ -247,7 +212,7 @@ def main_menu():
     btn2 = KeyboardButton("🚀 𝑹𝑼𝑵 𝑭𝑰𝑳𝑬")
     btn3 = KeyboardButton("⏹ 𝑺𝑻𝑶𝑷 𝑭𝑰𝑳𝑬")
     btn4 = KeyboardButton("📋 𝑽𝑰𝑬𝑾 𝑳𝑶𝑮𝑺")
-    btn5 = KeyboardButton("📊 𝑺𝑻𝑨𝑻𝑼𝑺")
+    btn5 = KeyboardButton("📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
     btn6 = KeyboardButton("⚡ 𝑺𝑷𝑬𝑬𝑫")
     btn7 = KeyboardButton("🔥 𝑫𝑬𝑭𝑨𝑼𝑳𝑻 𝑭𝑰𝑳𝑬")
     btn8 = KeyboardButton("👑 𝑫𝑬𝑽")
@@ -273,7 +238,8 @@ def send_welcome(message):
 📤 𝑼𝒑𝒍𝒐𝒂𝒅 𝒚𝒐𝒖𝒓 .𝒑𝒚 𝒇𝒊𝒍𝒆
 🚀 𝑹𝒖𝒏 𝒂𝒑𝒑𝒓𝒐𝒗𝒆𝒅 𝒇𝒊𝒍𝒆
 📋 𝑽𝒊𝒆𝒘 𝒍𝒊𝒗𝒆 𝒍𝒐𝒈𝒔
-📊 𝑪𝒉𝒆𝒄𝒌 𝒔𝒕𝒂𝒕𝒖𝒔 𝒂𝒏𝒅 𝒔𝒑𝒆𝒆𝒅
+📊 𝑳𝒊𝒗𝒆 𝑺𝒕𝒂𝒕𝒖𝒔
+⚡ 𝑺𝒑𝒆𝒆𝒅
 🔥 𝑹𝒖𝒏 𝒅𝒆𝒇𝒂𝒖𝒍𝒕 𝒇𝒂𝒔𝒕 𝒔𝒄𝒂𝒏𝒏𝒆𝒓
 
 👑 𝑫𝒆𝒗: @𝑺𝒖𝒏𝒓𝒂𝒌𝒖𝑽2
@@ -342,12 +308,10 @@ def handle_file_upload(message):
         session.file_path = file_path
         session.add_log(f"📤 File uploaded: {message.document.file_name}")
         
-        # 🔥 Variables replace karo (agar user ne diye hain)
         if session.user_bot_token and session.user_chat_id:
             replace_variables_in_file(file_path, session.user_bot_token, session.user_chat_id)
             session.add_log("✅ Variables replaced in file")
         
-        # 🔥 Send approval request
         success = send_approval_request(
             chat_id, 
             message.document.file_name, 
@@ -376,7 +340,6 @@ def set_default_file(message):
             user_sessions[chat_id] = UserSession(chat_id)
         session = user_sessions[chat_id]
     
-    # 🔥 Default file ke liye bhi variables maango
     msg1 = bot.reply_to(message, "🤖 **Enter your BOT TOKEN for default file:**", parse_mode='Markdown')
     bot.register_next_step_handler(msg1, lambda m: get_default_vars(m, session))
 
@@ -392,14 +355,35 @@ def set_default_with_vars(message, session):
     
     default_path = os.path.join(UPLOAD_DIR, "default_scanner.py")
     
-    # 🔥 Variables replace karo
-    replace_variables_in_file(default_path, session.user_bot_token, session.user_chat_id)
+    # 🔥 Default file content with variables
+    default_content = f'''
+#!/usr/bin/env python3
+import requests
+import random
+import time
+
+BOT_TOKEN = "{session.user_bot_token}"
+CHAT_ID = "{session.user_chat_id}"
+
+def fast_scanner():
+    print("Scanner started with BOT_TOKEN: {{BOT_TOKEN[:10]}}...")
+    print("CHAT_ID: {{CHAT_ID}}")
+    while True:
+        user_id = random.randint(2500000000, 21254029834)
+        print(f"Scanning: {{user_id}}")
+        time.sleep(0.1)
+
+if __name__ == "__main__":
+    fast_scanner()
+'''
+    
+    with open(default_path, 'w', encoding='utf-8') as f:
+        f.write(default_content)
     
     session.file_path = default_path
     session.is_approved = False
     session.add_log("🔥 Default file selected - pending approval")
     
-    # 🔥 Send approval request
     success = send_approval_request(
         chat_id, 
         "default_scanner.py", 
@@ -468,7 +452,7 @@ def run_file(message):
         
         threading.Thread(target=read_logs, daemon=True).start()
         
-        bot.reply_to(message, f"✅ **File started!**\n📁 `{os.path.basename(session.file_path)}`\n\n📋 Click **VIEW LOGS** to see output.\n📊 Click **STATUS** to check progress.", parse_mode='Markdown')
+        bot.reply_to(message, f"✅ **File started!**\n📁 `{os.path.basename(session.file_path)}`\n\n📋 Click **VIEW LOGS** to see output.\n📊 Click **LIVE STATUS** to check progress.", parse_mode='Markdown')
         
     except Exception as e:
         session.is_running = False
@@ -519,7 +503,7 @@ def view_logs(message):
             return
         session = user_sessions[chat_id]
     
-    logs = session.get_logs(20)
+    logs = session.get_logs(25)
     if not logs:
         bot.reply_to(message, "📋 **No logs yet.**\n\nRun a file to see output.", parse_mode='Markdown')
         return
@@ -527,9 +511,9 @@ def view_logs(message):
     bot.reply_to(message, f"📋 **Recent Logs:**\n```\n{logs}\n```", parse_mode='Markdown')
 
 # ============================================================
-# 📊 STATUS
+# 📊 LIVE STATUS (FIXED)
 # ============================================================
-@bot.message_handler(func=lambda msg: msg.text == "📊 𝑺𝑻𝑨𝑻𝑼𝑺")
+@bot.message_handler(func=lambda msg: msg.text == "📊 𝑳𝑰𝑽𝑬 𝑺𝑻𝑨𝑻𝑼𝑺")
 def show_status(message):
     chat_id = message.chat.id
     
@@ -544,20 +528,27 @@ def show_status(message):
     file_name = os.path.basename(session.file_path) if session.file_path else "None"
     
     runtime = "N/A"
-    if session.start_time and session.is_running:
-        runtime = str(datetime.now() - session.start_time).split('.')[0]
-    elif session.start_time:
-        runtime = str(datetime.now() - session.start_time).split('.')[0]
+    if session.start_time:
+        diff = datetime.now() - session.start_time
+        runtime = str(diff).split('.')[0]
+    
+    # Calculate speed
+    speed = session.speed
+    if session.is_running and session.start_time:
+        runtime_seconds = (datetime.now() - session.start_time).total_seconds()
+        if runtime_seconds > 0:
+            speed = int((session.total_checks / runtime_seconds) * 60)
+            session.speed = speed
     
     status_msg = f"""
-📊 **FILE STATUS**
+📊 **LIVE STATUS**
 
 📁 File: `{file_name}`
 🟢 Status: {status}
 ✅ Approval: {approved}
 ⏱ Runtime: {runtime}
 📊 Checks: {session.total_checks}
-📈 Speed: {session.speed} checks/min
+📈 Speed: {speed} checks/min
 📋 Logs: {len(session.logs)} lines
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -566,7 +557,7 @@ def show_status(message):
     bot.reply_to(message, status_msg, parse_mode='Markdown')
 
 # ============================================================
-# ⚡ SPEED
+# ⚡ SPEED (FIXED)
 # ============================================================
 @bot.message_handler(func=lambda msg: msg.text == "⚡ 𝑺𝑷𝑬𝑬𝑫")
 def show_speed(message):

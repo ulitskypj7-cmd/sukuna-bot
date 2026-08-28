@@ -4,9 +4,10 @@
 """
 🔥 SUNRAKU — ADVANCED FILE RUNNER BOT 🔥
 - User file upload karega
-- Approval request teri chat ID pe jaayegi
-- Approve ke baad hi file run ho sakti hai
-- Default file bhi approval ke baad run hogi
+- Bot automatically BOT_TOKEN + CHAT_ID replace karega
+- Approval system (owner approve karega)
+- Run/Stop/Logs/Status/Speed controls
+- Default file (fast hits) bhi available
 - Dev: @SunrakuV2 | Channel: @Anishpy | @VOUCH_R
 """
 
@@ -46,15 +47,19 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 OWNER_CHAT_ID = 8641613327
 
 # 🔥 Pending approvals
-pending_approvals = {}  # {user_chat_id: {"file_path": path, "file_name": name, "user_id": user_id}}
+pending_approvals = {}  # {user_chat_id: {"file_path": path, "file_name": name, "user_id": user_id, "bot_token": "", "chat_id": ""}}
 
 # ============================================================
 # 🔥 DEFAULT FILE (Fast Hits Wali)
 # ============================================================
 DEFAULT_FILE = """
+#!/usr/bin/env python3
 import requests
 import random
 import time
+
+BOT_TOKEN = "{BOT_TOKEN}"
+CHAT_ID = "{CHAT_ID}"
 
 def fast_scanner():
     while True:
@@ -79,11 +84,13 @@ class UserSession:
         self.file_path = None
         self.process = None
         self.is_running = False
-        self.is_approved = False  # 🔥 Approval status
+        self.is_approved = False
         self.logs = []
         self.start_time = None
         self.speed = 0
         self.total_checks = 0
+        self.user_bot_token = ""
+        self.user_chat_id = ""
         self.lock = threading.Lock()
     
     def add_log(self, msg):
@@ -96,16 +103,50 @@ class UserSession:
         return "\n".join(self.logs[-lines:]) if self.logs else "No logs yet."
 
 # ============================================================
+# 🔥 VARIABLE REPLACEMENT SYSTEM
+# ============================================================
+def replace_variables_in_file(file_path, bot_token, chat_id):
+    """File mein BOT_TOKEN aur CHAT_ID replace karo"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # 🔥 Replace variables
+        content = content.replace('"{BOT_TOKEN}"', f'"{bot_token}"')
+        content = content.replace('"{CHAT_ID}"', f'"{chat_id}"')
+        content = content.replace('{BOT_TOKEN}', bot_token)
+        content = content.replace('{CHAT_ID}', chat_id)
+        
+        # 🔥 Common patterns
+        content = re.sub(r'BOT_TOKEN\s*=\s*"[^"]*"', f'BOT_TOKEN = "{bot_token}"', content)
+        content = re.sub(r"BOT_TOKEN\s*=\s*'[^']*'", f"BOT_TOKEN = '{bot_token}'", content)
+        content = re.sub(r'CHAT_ID\s*=\s*"[^"]*"', f'CHAT_ID = "{chat_id}"', content)
+        content = re.sub(r"CHAT_ID\s*=\s*'[^']*'", f"CHAT_ID = '{chat_id}'", content)
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        return True
+    except Exception as e:
+        return False
+
+# ============================================================
 # 🔥 APPROVAL SYSTEM
 # ============================================================
-def send_approval_request(user_chat_id, file_name, file_path):
+def send_approval_request(user_chat_id, file_name, file_path, bot_token="", chat_id=""):
     """Owner ko approval request bhejo"""
+    token_info = f"🤖 Bot Token: `{bot_token[:10]}...`" if bot_token else "⏳ Pending..."
+    chat_info = f"📌 Chat ID: `{chat_id}`" if chat_id else "⏳ Pending..."
+    
     msg = f"""
 🔔 **NEW FILE UPLOADED - APPROVAL NEEDED**
 
 👤 User ID: `{user_chat_id}`
 📁 File: `{file_name}`
 📂 Path: `{file_path}`
+
+{token_info}
+{chat_info}
 
 📌 Click Approve to allow user to run this file.
 """
@@ -132,7 +173,7 @@ def approve_file(call):
     """Owner ne approve kiya"""
     data = call.data.split("_")
     user_chat_id = int(data[1])
-    file_path = "_".join(data[2:])  # Path mein underscores ho sakte hain
+    file_path = "_".join(data[2:])
     
     with lock:
         if user_chat_id not in user_sessions:
@@ -141,6 +182,11 @@ def approve_file(call):
         session = user_sessions[user_chat_id]
         session.is_approved = True
         session.add_log("✅ File approved by owner")
+    
+    # 🔥 Variables replace karo (agar user ne diye hain)
+    if session.user_bot_token and session.user_chat_id:
+        replace_variables_in_file(file_path, session.user_bot_token, session.user_chat_id)
+        session.add_log("✅ Variables replaced in file")
     
     bot.edit_message_text(
         f"✅ **File Approved!**\n👤 User: `{user_chat_id}`\n📁 File: `{os.path.basename(file_path)}`\n\nUser can now run the file.",
@@ -179,7 +225,6 @@ def reject_file(call):
         parse_mode='Markdown'
     )
     
-    # User ko notify karo
     try:
         bot.send_message(
             user_chat_id,
@@ -241,7 +286,31 @@ def send_welcome(message):
 # ============================================================
 @bot.message_handler(func=lambda msg: msg.text == "📤 𝑼𝑷𝑳𝑶𝑨𝑫 𝑭𝑰𝑳𝑬")
 def upload_file(message):
-    bot.reply_to(message, "📤 **Send your .py file** (max 5MB)\n\n📌 File will be sent for approval before you can run it.", parse_mode='Markdown')
+    msg1 = bot.reply_to(message, "📤 **Send your .py file** (max 5MB)\n\n📌 File will be sent for approval.", parse_mode='Markdown')
+    bot.register_next_step_handler(msg1, get_variables)
+
+def get_variables(message):
+    chat_id = message.chat.id
+    
+    with lock:
+        if chat_id not in user_sessions:
+            user_sessions[chat_id] = UserSession(chat_id)
+        session = user_sessions[chat_id]
+    
+    msg2 = bot.reply_to(message, "🤖 **Enter your BOT TOKEN:**\n\n📌 This will be automatically added to your file.", parse_mode='Markdown')
+    bot.register_next_step_handler(msg2, lambda m: get_chat_id(m, session))
+
+def get_chat_id(message, session):
+    session.user_bot_token = message.text.strip()
+    
+    msg3 = bot.reply_to(message, "📌 **Enter your CHAT ID:**\n\n📌 This will be automatically added to your file.", parse_mode='Markdown')
+    bot.register_next_step_handler(msg3, lambda m: handle_file_upload_with_vars(m, session))
+
+def handle_file_upload_with_vars(message, session):
+    chat_id = message.chat.id
+    session.user_chat_id = message.text.strip()
+    
+    bot.reply_to(message, "✅ **Variables saved!**\n\n📤 Now send your .py file.", parse_mode='Markdown')
 
 @bot.message_handler(content_types=['document'])
 def handle_file_upload(message):
@@ -260,7 +329,7 @@ def handle_file_upload(message):
         if chat_id not in user_sessions:
             user_sessions[chat_id] = UserSession(chat_id)
         session = user_sessions[chat_id]
-        session.is_approved = False  # 🔥 Reset approval on new upload
+        session.is_approved = False
     
     try:
         file_info = bot.get_file(file_id)
@@ -273,8 +342,19 @@ def handle_file_upload(message):
         session.file_path = file_path
         session.add_log(f"📤 File uploaded: {message.document.file_name}")
         
-        # 🔥 Send approval request to owner
-        success = send_approval_request(chat_id, message.document.file_name, file_path)
+        # 🔥 Variables replace karo (agar user ne diye hain)
+        if session.user_bot_token and session.user_chat_id:
+            replace_variables_in_file(file_path, session.user_bot_token, session.user_chat_id)
+            session.add_log("✅ Variables replaced in file")
+        
+        # 🔥 Send approval request
+        success = send_approval_request(
+            chat_id, 
+            message.document.file_name, 
+            file_path,
+            session.user_bot_token,
+            session.user_chat_id
+        )
         
         if success:
             bot.reply_to(message, f"✅ **File uploaded successfully!**\n📁 `{message.document.file_name}`\n\n⏳ **Waiting for owner approval...**\nYou will be notified when approved.", parse_mode='Markdown')
@@ -296,13 +376,37 @@ def set_default_file(message):
             user_sessions[chat_id] = UserSession(chat_id)
         session = user_sessions[chat_id]
     
+    # 🔥 Default file ke liye bhi variables maango
+    msg1 = bot.reply_to(message, "🤖 **Enter your BOT TOKEN for default file:**", parse_mode='Markdown')
+    bot.register_next_step_handler(msg1, lambda m: get_default_vars(m, session))
+
+def get_default_vars(message, session):
+    session.user_bot_token = message.text.strip()
+    
+    msg2 = bot.reply_to(message, "📌 **Enter your CHAT ID:**", parse_mode='Markdown')
+    bot.register_next_step_handler(msg2, lambda m: set_default_with_vars(m, session))
+
+def set_default_with_vars(message, session):
+    chat_id = message.chat.id
+    session.user_chat_id = message.text.strip()
+    
     default_path = os.path.join(UPLOAD_DIR, "default_scanner.py")
+    
+    # 🔥 Variables replace karo
+    replace_variables_in_file(default_path, session.user_bot_token, session.user_chat_id)
+    
     session.file_path = default_path
-    session.is_approved = False  # 🔥 Default file bhi approval require karega
+    session.is_approved = False
     session.add_log("🔥 Default file selected - pending approval")
     
-    # 🔥 Send approval request for default file
-    success = send_approval_request(chat_id, "default_scanner.py", default_path)
+    # 🔥 Send approval request
+    success = send_approval_request(
+        chat_id, 
+        "default_scanner.py", 
+        default_path,
+        session.user_bot_token,
+        session.user_chat_id
+    )
     
     if success:
         bot.reply_to(message, "✅ **Default scanner selected!**\n\n⏳ **Waiting for owner approval...**\nYou will be notified when approved.", parse_mode='Markdown')
@@ -321,7 +425,6 @@ def run_file(message):
             user_sessions[chat_id] = UserSession(chat_id)
         session = user_sessions[chat_id]
     
-    # 🔥 Check approval
     if not session.is_approved:
         bot.reply_to(message, "❌ **File not approved!**\n\n📌 Upload a file or select default file.\n⏳ Wait for owner approval.", parse_mode='Markdown')
         return
@@ -336,13 +439,6 @@ def run_file(message):
         return
     
     try:
-        # Install requirements if present
-        req_file = os.path.join(os.path.dirname(session.file_path), "requirements.txt")
-        if os.path.exists(req_file):
-            subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_file], capture_output=True)
-            session.add_log("📦 Requirements installed")
-        
-        # Run file
         session.process = subprocess.Popen(
             [sys.executable, session.file_path],
             stdout=subprocess.PIPE,
@@ -355,7 +451,6 @@ def run_file(message):
         session.total_checks = 0
         session.add_log(f"🚀 File started: {os.path.basename(session.file_path)}")
         
-        # Log reader thread
         def read_logs():
             while session.is_running:
                 try:
@@ -366,7 +461,6 @@ def run_file(message):
                 except:
                     break
             
-            # Read remaining stderr
             if session.process:
                 stderr = session.process.stderr.read()
                 if stderr:

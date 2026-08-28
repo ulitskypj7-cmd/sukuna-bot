@@ -59,6 +59,7 @@ class UserSession:
         self.is_approved = False
         self.logs = []
         self.start_time = None
+        self.end_time = None
         self.speed = 0
         self.total_checks = 0
         self.user_bot_token = ""
@@ -76,17 +77,18 @@ class UserSession:
     
     def get_runtime(self):
         if self.start_time:
-            diff = datetime.now() - self.start_time
+            end_time = self.end_time or datetime.now()
+            diff = end_time - self.start_time
             return str(diff).split('.')[0]
         return "N/A"
     
     def get_speed(self):
-        if self.is_running and self.start_time:
-            runtime_seconds = (datetime.now() - self.start_time).total_seconds()
-            if runtime_seconds > 5:  # Minimum 5 seconds for accurate speed
-                speed = int((self.total_checks / runtime_seconds) * 60)
-                self.speed = speed
-                return speed
+        if self.start_time:
+            end_time = self.end_time or datetime.now()
+            runtime_seconds = max((end_time - self.start_time).total_seconds(), 1)
+            speed = int((self.total_checks / runtime_seconds) * 60)
+            self.speed = speed
+            return speed
         return self.speed or 0
 
 # ============================================================
@@ -459,31 +461,45 @@ def run_file(message):
     
     try:
         session.process = subprocess.Popen(
-            [sys.executable, session.file_path],
+            # -u makes Python child scripts flush output immediately.
+            [sys.executable, "-u", session.file_path],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
             bufsize=1
         )
         session.is_running = True
         session.start_time = datetime.now()
+        session.end_time = None
         session.total_checks = 0
+        session.speed = 0
         session.add_log(f"🚀 File started: {os.path.basename(session.file_path)}")
         
         def read_logs():
-            while session.is_running:
+            # Keep reading until the process really exits. The old loop
+            # depended on is_running and could leave status stuck at RUNNING.
+            while True:
                 try:
                     output = session.process.stdout.readline()
                     if output:
                         session.add_log(output.strip())
                         session.total_checks += 1
-                except:
+                        continue
+
+                    if session.process.poll() is not None:
+                        break
+                    time.sleep(0.05)
+                except Exception as e:
+                    session.add_log(f"⚠️ Log reader error: {e}")
                     break
             
-            if session.process:
-                stderr = session.process.stderr.read()
-                if stderr:
-                    session.add_log(f"⚠️ {stderr.strip()}")
+            return_code = session.process.poll()
+            session.is_running = False
+            session.end_time = datetime.now()
+            if return_code == 0:
+                session.add_log("✅ File finished")
+            elif return_code is not None:
+                session.add_log(f"⚠️ File exited with code {return_code}")
         
         threading.Thread(target=read_logs, daemon=True).start()
         
@@ -512,12 +528,14 @@ def stop_file(message):
         return
     
     try:
+        # Set this before terminate so the status changes immediately.
+        session.is_running = False
         session.process.terminate()
         time.sleep(1)
         if session.process.poll() is None:
             session.process.kill()
         
-        session.is_running = False
+        session.end_time = datetime.now()
         session.add_log("⏹ File stopped")
         
         bot.reply_to(message, "⏹ **File stopped successfully!**", parse_mode='Markdown')
@@ -557,6 +575,11 @@ def show_live_status(message):
             bot.reply_to(message, "❌ **No session found!**\n\n📌 Please /start first.", parse_mode='Markdown')
             return
         session = user_sessions[chat_id]
+
+    # Catch a child process that ended between two status button presses.
+    if session.process and session.process.poll() is not None and session.is_running:
+        session.is_running = False
+        session.end_time = session.end_time or datetime.now()
     
     status_icon = "🟢" if session.is_running else "🔴"
     status_text = "RUNNING" if session.is_running else "STOPPED"
@@ -594,16 +617,22 @@ def show_speed(message):
             return
         session = user_sessions[chat_id]
     
-    if not session.is_running:
-        bot.reply_to(message, "⚠️ **No file is running!**\n\n📌 Start a file first using **RUN FILE**.", parse_mode='Markdown')
+    if not session.start_time:
+        bot.reply_to(message, "⚠️ **No file has been run yet!**\n\n📌 Start a file first using **RUN FILE**.", parse_mode='Markdown')
         return
     
+    if session.process and session.process.poll() is not None and session.is_running:
+        session.is_running = False
+        session.end_time = session.end_time or datetime.now()
+
     runtime = session.get_runtime()
     speed = session.get_speed()
+    run_state = "🟢 Running" if session.is_running else "🔴 Stopped/Finished"
     
     speed_msg = f"""
 ⚡ **SPEED REPORT**
 
+📌 **State:** `{run_state}`
 📊 **Total Checks:** `{session.total_checks}`
 ⏱ **Runtime:** `{runtime}`
 ⚡ **Speed:** `{speed}` checks/min
